@@ -1,0 +1,26 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Gerät ist schon konfiguriert"
+        },
+        "error": {
+            "cannot_connect": "Verbindungsproblem",
+            "invalid_auth": "Falsche Zugangsdaten",
+            "unknown": "Unerwarteter Fehler"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "code": "User-Code",
+                    "host": "Host"
+                }
+            }
+        }
+    },
+    "entity": {
+        "binary_sensor": {
+        },
+        "sensor": {
+        }
+    }
+}
