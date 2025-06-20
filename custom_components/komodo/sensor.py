@@ -47,30 +47,18 @@ async def async_setup_entry(
     # If you do not want to retry setup on failure, use
     # coordinator.async_refresh() instead
     #
-    try:
-        await coordinator.async_config_entry_first_refresh()
-        # FIXME
-    except WrongCodeException as e:
-        # Raising ConfigEntryAuthFailed will cancel future updates
-        # and start a config flow with SOURCE_REAUTH (async_step_reauth)
-        raise ConfigEntryAuthFailed from e
+    #try:
+    await coordinator.async_config_entry_first_refresh()
+    # FIXME
+    #except WrongCodeException as e:
+    #    # Raising ConfigEntryAuthFailed will cancel future updates
+    #    # and start a config flow with SOURCE_REAUTH (async_step_reauth)
+    #    raise ConfigEntryAuthFailed from e
 
-    # FIXME look into device info
-    device_info = DeviceInfo(
-        configuration_url=None,
-        connections=set(),
-        entry_type=None,
-        hw_version=None,
-        identifiers={(DOMAIN, config_entry.entry_id)},
-        manufacturer="BWT",
-        model=f'Perla {model_suffix}',
-        name=config_entry.title,
-        serial_number=None,
-        suggested_area=None,
-        sw_version=coordinator.data.firmware_version,
-        via_device=None,
-    )
-
-    entities = []
+    entities = [
+        get_server_sensors(coordinator, config_entry.entry_id) +
+        get_stack_sensors(coordinator, config_entry.entry_id) +
+        get_alerts_sensors(coordinator, config_entry.entry_id)
+    ]
 
     async_add_entities(entities)

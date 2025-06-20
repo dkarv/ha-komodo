@@ -1,19 +1,29 @@
 """Coordinator to fetch the data once for all sensors."""
 
 import asyncio
-from datetime import timedelta
 import logging
+
+from komodo_api import KomodoClient
+from komodo_api.types import ListServersResponse, ListStackServicesResponse, ListAlertsResponse, ListServers, ListStacks, ListAlerts
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-_UPDATE_INTERVAL_MIN = 1
-_UPDATE_INTERVAL_MAX = 30
+class KomodoData:
+    # listServers(ListServers)
+    servers: ListServersResponse
+    stacks: ListStackServicesResponse
+    alerts: ListAlertsResponse
+
+    def __init__(self, servers: ListServersResponse, stacks: ListStackServicesResponse, alerts: ListAlertsResponse):
+        self.servers = servers
+        self.stacks = stacks
+        self.alerts = alerts
 
 
-class KomodoCoordinator(DataUpdateCoordinator[FIXME]):
+class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
     """Komodo coordinator."""
 
     def __init__(self, hass: HomeAssistant, my_api: KomodoClient) -> None:
@@ -22,7 +32,7 @@ class KomodoCoordinator(DataUpdateCoordinator[FIXME]):
             hass,
             _LOGGER,
             # Name of the data. For logging purposes.
-            name="FIXME",
+            name="KomodoData",
         )
         self.my_api = my_api
 
@@ -35,6 +45,12 @@ class KomodoCoordinator(DataUpdateCoordinator[FIXME]):
         # Note: asyncio.TimeoutError and aiohttp.ClientError are already
         # handled by the data update coordinator.
         async with asyncio.timeout(10):
-            # FIXME
-            new_values = await self.my_api.get_current_data()
-            return new_values
+            tasks = [
+                self.my_api.read.listServers(ListServers()),
+                self.my_api.read.listStacks(ListStacks()),
+                self.my_api.read.listAlerts(ListAlerts(
+                    query = { 'resolved': False },
+                )),
+            ]
+            responses = await asyncio.gather(*tasks)
+            return KomodoData(responses[0], responses[1], responses[2])
