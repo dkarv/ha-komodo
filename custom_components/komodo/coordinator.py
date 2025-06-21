@@ -3,8 +3,8 @@
 import asyncio
 import logging
 
-from komodo_api import KomodoClient
-from komodo_api.types import ListServersResponse, ListStackServicesResponse, ListAlertsResponse, ListServers, ListStacks, ListAlerts
+from komodo_api.lib import KomodoClient
+from komodo_api.types import ListServersResponse, ListStacksResponse, ListAlertsResponse, ListServers, ListStacks, ListAlerts
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -12,12 +12,11 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 class KomodoData:
-    # listServers(ListServers)
     servers: ListServersResponse
-    stacks: ListStackServicesResponse
+    stacks: ListStacksResponse
     alerts: ListAlertsResponse
 
-    def __init__(self, servers: ListServersResponse, stacks: ListStackServicesResponse, alerts: ListAlertsResponse):
+    def __init__(self, servers: ListServersResponse, stacks: ListStacksResponse, alerts: ListAlertsResponse):
         self.servers = servers
         self.stacks = stacks
         self.alerts = alerts

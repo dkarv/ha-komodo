@@ -4,10 +4,10 @@ from typing import Any
 
 import voluptuous as vol
 
-from komodo_api import KomodoClient, ApiKeyInitOptions
+from komodo_api.lib import KomodoClient, ApiKeyInitOptions
+from komodo_api.types import GetVersion
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET
@@ -35,7 +35,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     Data has the keys from _komodo_schema with values provided by the user.
     """
     async with KomodoClient(data[CONF_HOST], ApiKeyInitOptions(data[CONF_API_KEY], data[CONF_API_SECRET])) as api:
-       await api.read.getVersion()
+       await api.read.getVersion(GetVersion())
 
     # Return info that you want to store in the config entry.
     return {"title": "Komodo"}
@@ -66,8 +66,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
 
+        schema = _komodo_schema() if user_input is None else _komodo_schema(
+            user_input[CONF_HOST], user_input[CONF_API_KEY], user_input[CONF_API_SECRET],
+        )
         return self.async_show_form(
-            step_id="user", data_schema=_komodo_schema(), errors=errors
+            step_id="user", data_schema=schema, errors=errors
         )
     
 

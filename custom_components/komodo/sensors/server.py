@@ -1,6 +1,5 @@
 from ..coordinator import KomodoCoordinator
-from base import KomodoSensor
-from komodo_api.types import ServerListItem
+from .base import KomodoSensor
 
 def create_server_sensors(
     coordinator: KomodoCoordinator, id: str,
@@ -11,9 +10,9 @@ def create_server_sensors(
     return [
         KomodoSensor(
             coordinator=coordinator,
-            extractor= lambda item: item.state,
+            extractor= lambda item: item.info.state,
             category = "server",
             key = "state",
-            id = server.id
+            id = server.name,
         ) for server in coordinator.data.servers
     ]

@@ -23,6 +23,9 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from .sensors.alert import create_alert_sensors
+from .sensors.server import create_server_sensors
+from .sensors.stack import create_stack_sensors
 
 from .const import DOMAIN
 from .coordinator import KomodoCoordinator
@@ -55,10 +58,6 @@ async def async_setup_entry(
     #    # and start a config flow with SOURCE_REAUTH (async_step_reauth)
     #    raise ConfigEntryAuthFailed from e
 
-    entities = [
-        get_server_sensors(coordinator, config_entry.entry_id) +
-        get_stack_sensors(coordinator, config_entry.entry_id) +
-        get_alerts_sensors(coordinator, config_entry.entry_id)
-    ]
+    entities = create_server_sensors(coordinator, config_entry.entry_id) + create_stack_sensors(coordinator, config_entry.entry_id) + create_alert_sensors(coordinator, config_entry.entry_id)
 
     async_add_entities(entities)

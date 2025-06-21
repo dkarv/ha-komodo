@@ -24,14 +24,15 @@ class KomodoSensor(CoordinatorEntity[KomodoCoordinator], SensorEntity):
         extractor,
         category: str,
         key: str,
-        id: str,
+        id: str | None,
     ) -> None:
         """Initialize the sensor with the common coordinator."""
         super().__init__(coordinator)
         self._extractor = extractor
         self._attr_translation_key = f"${category}_${key}"
         self._attr_has_entity_name = True
-        self._attr_unique_id = f"${category}_${id}_${key}"
+        id_part = "" if id is None else f"_${id}"
+        self._attr_unique_id = f"${category}${id_part}_${key}"
         self.entity_id = f"sensor.${DOMAIN}_${self._attr_unique_id}"
 
     @callback
