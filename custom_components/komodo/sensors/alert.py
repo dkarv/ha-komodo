@@ -2,7 +2,8 @@ from ..coordinator import KomodoCoordinator
 from .base import KomodoSensor
 
 def create_alert_sensors(
-    coordinator: KomodoCoordinator, id: str,
+    coordinator: KomodoCoordinator, 
+    id: str,
 ) -> list[KomodoSensor]:
     """
     Returns a list of sensors.
@@ -10,16 +11,18 @@ def create_alert_sensors(
     return [
         KomodoSensor(
             coordinator=coordinator,
-            extractor= lambda item: len(item.alerts) + 1 if item.next_page is None else 0,
+            id = id,
+            extractor= lambda item: len(item.alerts.alerts) + 0 if item.alerts.next_page is None else 1,
             category = "alert",
             key = "alertcount",
-            id = None,
+            name = None,
         ),
         KomodoSensor(
             coordinator=coordinator,
-            extractor= lambda item: ", ".join([alert.data.type for alert in item.alerts]),
+            id = id,
+            extractor= lambda item: ", ".join([alert.data.type for alert in item.alerts.alerts]),
             category = "alert",
             key = "alerts",
-            id = None,
+            name = None,
         ),
     ]

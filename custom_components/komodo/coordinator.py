@@ -2,24 +2,33 @@
 
 import asyncio
 import logging
+from typing import Mapping
 
 from komodo_api.lib import KomodoClient
-from komodo_api.types import ListServersResponse, ListStacksResponse, ListAlertsResponse, ListServers, ListStacks, ListAlerts
+from komodo_api.types import ListServersResponse, ListStacksResponse, ListAlertsResponse, ListServers, ListStacks, ListAlerts, ServerListItem, StackListItem
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+# Arrange servers into a mapping where the key is the name property
+def arrange_servers_by_name(servers: ListServersResponse) -> Mapping[str, ServerListItem]:
+    return {server.name: server for server in servers if hasattr(server, "name")}
+
+# Arrange stacks into a mapping where the key is the name property
+def arrange_stacks_by_name(stacks: ListStacksResponse) -> Mapping[str, StackListItem]:
+    return {stack.name: stack for stack in stacks if hasattr(stack, "name")}
+
 class KomodoData:
-    servers: ListServersResponse
-    stacks: ListStacksResponse
+    servers: Mapping[str, ServerListItem]
+    stacks: Mapping[str, StackListItem]
     alerts: ListAlertsResponse
 
     def __init__(self, servers: ListServersResponse, stacks: ListStacksResponse, alerts: ListAlertsResponse):
-        self.servers = servers
-        self.stacks = stacks
         self.alerts = alerts
+        self.servers = arrange_servers_by_name(servers)
+        self.stacks = arrange_stacks_by_name(stacks)
 
 
 class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):

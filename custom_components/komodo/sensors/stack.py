@@ -1,26 +1,31 @@
 from ..coordinator import KomodoCoordinator
-from .base import KomodoSensor
+from .base import KomodoSensor, KomodoOptionSensor
+from komodo_api.types import StackState
 
 def create_stack_sensors(
-    coordinator: KomodoCoordinator, id: str,
+    coordinator: KomodoCoordinator, 
+    id: str,
 ) -> list[KomodoSensor]:
     """
     Returns a list of sensors.
     """
     return [
-        KomodoSensor(
+        KomodoOptionSensor(
             coordinator=coordinator,
-            extractor= lambda item: item.info.state,
+            id=id,
+            extractor= lambda item: item.stacks[stack.name].info.state.name,
             category = "stack",
             key = "state",
-            id = stack.name,
-        ) for stack in coordinator.data.stacks
+            name = stack.name,
+            options = [state.name for state in StackState],
+        ) for stack in coordinator.data.stacks.values()
     ] + [
         KomodoSensor(
             coordinator=coordinator,
-            extractor= lambda item: any(service.update_available for service in item.info.services),
+            id=id,
+            extractor= lambda item: any(service.update_available for service in item.stacks[stack.name].info.services),
             category = "stack",
             key = "updateavailable",
-            id = stack.name,
-        ) for stack in coordinator.data.stacks
+            name = stack.name,
+        ) for stack in coordinator.data.stacks.values()
     ]

@@ -6,9 +6,11 @@ import voluptuous as vol
 
 from komodo_api.lib import KomodoClient, ApiKeyInitOptions
 from komodo_api.types import GetVersion
+from komodo_api.exceptions import KomodoException
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
+from aiohttp import ClientConnectionError
 
 from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET
 
@@ -56,12 +58,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 info = await validate_input(self.hass, user_input)
                 return self.async_create_entry(title=info["title"], data=user_input)
-#            except TODO:
-#                _LOGGER.exception("Connection error setting up the Komodo api")
-#                errors["base"] = "cannot_connect"
-#            except TODO:
-#                _LOGGER.exception("Wrong user code passed to Komodo api")
-#                errors["base"] = "invalid_auth"
+            except ClientConnectionError:
+                _LOGGER.exception("Connection error setting up the Komodo api")
+                errors["base"] = "cannot_connect"
+            except KomodoException as e:
+                _LOGGER.exception("Api error setting up the Komodo api")
+                if e.code == 401:
+                    errors["base"] = "invalid_auth"
+                    errors["details"] = e.error
+                else:
+                    errors["base"] = "unknown"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
