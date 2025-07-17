@@ -1,5 +1,5 @@
 from ..coordinator import KomodoCoordinator
-from .base import KomodoSensor, KomodoOptionSensor
+from .common import KomodoSensor, KomodoOptionSensor
 from komodo_api.types import ServerState
 
 def create_server_sensors(

@@ -6,7 +6,6 @@ from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.helpers.entity import Entity
 from homeassistant.core import callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ..const import DOMAIN
@@ -29,12 +28,12 @@ class KomodoEntity(CoordinatorEntity[KomodoCoordinator], Entity):
         """Initialize the common functionality."""
         super().__init__(coordinator)
         self._extractor = extractor
-        self._attr_translation_key = f"${category}_${key}"
+        self._attr_translation_key = f"{category}_{key}"
         self._attr_has_entity_name = True
-        name_part = "" if name is None else f"_${name}"
-        entity_id = f"${category}${name_part}_${key}"
-        self.entity_id = f"sensor.${DOMAIN}_${entity_id}"
-        self._attr_unique_id = f"${id}_${entity_id}"
+        name_part = "" if name is None else f"_{name}"
+        entity_id = f"{category}{name_part}_{key}"
+        self.entity_id = f"sensor.{DOMAIN}_{entity_id}"
+        self._attr_unique_id = f"{id}_{entity_id}"
 
 class KomodoSensor(KomodoEntity, SensorEntity):
     """Basic sensor with common functionality."""

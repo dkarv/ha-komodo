@@ -28,36 +28,26 @@ from .sensors.server import create_server_sensors
 from .sensors.stack import create_stack_sensors
 
 from .const import DOMAIN
-from .coordinator import KomodoCoordinator
+from .base import KomodoBase
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Komodo sensors from config entry."""
-    my_api = hass.data[DOMAIN][config_entry.entry_id]
-    coordinator = KomodoCoordinator(hass, my_api)
+    komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
 
-    # Fetch initial data so we have data when entities subscribe
-    #
-    # If the refresh fails, async_config_entry_first_refresh will
-    # raise ConfigEntryNotReady and setup will try again later
-    #
-    # If you do not want to retry setup on failure, use
-    # coordinator.async_refresh() instead
-    #
-    #try:
-    await coordinator.async_config_entry_first_refresh()
-    # FIXME
-    #except WrongCodeException as e:
-    #    # Raising ConfigEntryAuthFailed will cancel future updates
-    #    # and start a config flow with SOURCE_REAUTH (async_step_reauth)
-    #    raise ConfigEntryAuthFailed from e
+    await komodo.first_refresh()
+    # FIXME catch invalid auth exception and raise ConfigEntryAuthFailed
 
-    entities = create_server_sensors(coordinator, config_entry.entry_id) + create_stack_sensors(coordinator, config_entry.entry_id) + create_alert_sensors(coordinator, config_entry.entry_id)
+    entities = (
+        create_server_sensors(komodo.coordinator, entry.entry_id) + 
+        create_stack_sensors(komodo.coordinator, entry.entry_id) + 
+        create_alert_sensors(komodo.coordinator, entry.entry_id)
+    )
 
     async_add_entities(entities)

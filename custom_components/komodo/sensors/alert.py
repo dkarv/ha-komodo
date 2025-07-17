@@ -1,5 +1,5 @@
 from ..coordinator import KomodoCoordinator
-from .base import KomodoSensor
+from .common import KomodoSensor
 
 def create_alert_sensors(
     coordinator: KomodoCoordinator, 

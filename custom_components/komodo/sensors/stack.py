@@ -1,6 +1,7 @@
 from ..coordinator import KomodoCoordinator
-from .base import KomodoSensor, KomodoOptionSensor
+from .common import KomodoSensor, KomodoOptionSensor, KomodoEntity
 from komodo_api.types import StackState
+from homeassistant.components.update import UpdateEntity
 
 def create_stack_sensors(
     coordinator: KomodoCoordinator, 
@@ -18,14 +19,5 @@ def create_stack_sensors(
             key = "state",
             name = stack.name,
             options = [state.name for state in StackState],
-        ) for stack in coordinator.data.stacks.values()
-    ] + [
-        KomodoSensor(
-            coordinator=coordinator,
-            id=id,
-            extractor= lambda item: any(service.update_available for service in item.stacks[stack.name].info.services),
-            category = "stack",
-            key = "updateavailable",
-            name = stack.name,
         ) for stack in coordinator.data.stacks.values()
     ]
