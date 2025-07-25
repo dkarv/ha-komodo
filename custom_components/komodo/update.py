@@ -9,11 +9,11 @@ from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .base import KomodoBase
-from komodo_api.types import StackListItem, StackServiceWithUpdate, InspectStackContainerResponse
+from komodo_api.types import StackListItem, StackServiceWithUpdate, InspectStackContainerResponse, DeployStack
 from .coordinator import KomodoCoordinator
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ async def async_setup_entry(
     stacks: list[StackListItem] = komodo.coordinator.data.stacks.values()
     seen = set()
     async_add_entities(
-        KomodoUpdateEntity(komodo.coordinator, entry.entry_id, stack.name, service.service)
+        KomodoUpdateEntity(komodo, entry.entry_id, stack.name, service.service)
         for stack in stacks for service in stack.info.services
         if not ((stack.name, service.service) in seen or seen.add((stack.name, service.service)))
     )
@@ -38,20 +38,22 @@ async def async_setup_entry(
 class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
 
     _attr_supported_features = (
-        UpdateEntityFeature.INSTALL | UpdateEntityFeature.RELEASE_NOTES
+        UpdateEntityFeature.INSTALL #| UpdateEntityFeature.RELEASE_NOTES
     )
+    _komodo: KomodoBase
     _stack: str
     _service: str
 
     def __init__(
         self,
-        coordinator: KomodoCoordinator,
+        komodo: KomodoBase,
         id: str,
         stack: str,
         service: str,
     ) -> None:
         """Initialize the update entity."""
-        super().__init__(coordinator)
+        super().__init__(komodo.coordinator)
+        self._komodo = komodo
         self._stack = stack
         self._service = service
         entity_id = f"update_{stack}_{service}"
@@ -73,14 +75,14 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
     @property
     def name(self) -> str | None:
         """Return the name."""
-        return f"{self._stack} - {self._service} update"
+        return f"{self._stack} - {self._service}"
 
     @property
     def latest_version(self) -> str:
         """Return latest version of the entity."""
         service = self._find_service()
         if service and service.update_available:
-            return "update"
+            return "update available"
         return "0"
 
 #    @property
@@ -100,9 +102,13 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
 
     async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
         """Install an update."""
-        # FIXME
+        try:
+            update = await self._komodo.api.execute.deployStack(DeployStack(stack= self._stack, services= [self._service]))
+            _LOGGER.info("Deployment result: %s", update)
+        except Exception as err:
+            _LOGGER.error("Failed to deploy service %s/%s: %s", self._stack, self._service, err)
+            raise HomeAssistantError(f"Deployment failed: {err}") from err
 
     async def async_release_notes(self) -> str | None:
         """Return the release notes."""
         return "Release notes"
-        # FIXME
