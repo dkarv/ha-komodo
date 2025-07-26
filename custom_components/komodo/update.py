@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 import logging
+import asyncio
 
 from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.config_entries import ConfigEntry
@@ -13,7 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .base import KomodoBase
-from komodo_api.types import StackListItem, StackServiceWithUpdate, InspectStackContainerResponse, DeployStack
+from komodo_api.types import StackListItem, StackServiceWithUpdate, InspectStackContainerResponse, DeployStack, Update, UpdateStatus, GetUpdate
 from .coordinator import KomodoCoordinator
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
 
     
     @property
-    def name(self) -> str | None:
+    def title(self) -> str | None:
         """Return the name."""
         return f"{self._stack} - {self._service}"
 
@@ -97,17 +98,22 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
         """Return downloaded version of the entity."""
         details = self._find_version()
         if details and details.config and details.config.labels:
-            return details.config.labels.get("org.opencontainers.image.version")
+            return details.config.labels.get("org.opencontainers.image.version", "0")
         return "0"
 
     async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
         """Install an update."""
-        try:
-            update = await self._komodo.api.execute.deployStack(DeployStack(stack= self._stack, services= [self._service]))
-            _LOGGER.info("Deployment result: %s", update)
-        except Exception as err:
-            _LOGGER.error("Failed to deploy service %s/%s: %s", self._stack, self._service, err)
-            raise HomeAssistantError(f"Deployment failed: {err}") from err
+        update: Update = await self._komodo.api.execute.deployStack(DeployStack(stack= self._stack, services= [self._service]))
+        while not update.status == UpdateStatus.COMPLETE:
+            await asyncio.sleep(1)
+            update = await self._komodo.api.read.getUpdate(GetUpdate(id = update.id.oid))
+        if update.success:
+            _LOGGER.info("Deployment of %s/%s successful", self._stack, self._service)
+            await self.coordinator.async_refresh()
+        else:
+            logs = "\n".join(f"[{log.stage}] {log.stderr} {log.stdout}" for log in update.logs)
+            _LOGGER.error("Deployment of %s/%s failed. Logs:\n%s", self._stack, self._service, logs)
+
 
     async def async_release_notes(self) -> str | None:
         """Return the release notes."""
