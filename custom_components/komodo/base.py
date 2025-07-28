@@ -1,6 +1,7 @@
 from komodo_api.lib import KomodoClient, ApiKeyInitOptions
 from komodo_api.types import GetVersion
 from .coordinator import KomodoCoordinator
+from .const import normalize_host_url
 from homeassistant.core import HomeAssistant
 
 class KomodoBase:
@@ -8,7 +9,8 @@ class KomodoBase:
     coordinator: KomodoCoordinator
 
     def __init__(self, hass: HomeAssistant, host: str, init_options: ApiKeyInitOptions) -> None:
-        self.api = KomodoClient(host, init_options)
+        normalized_host = normalize_host_url(host)
+        self.api = KomodoClient(normalized_host, init_options)
         self.coordinator = KomodoCoordinator(hass, self.api)
 
 
