@@ -1,21 +1,14 @@
 # Komodo Home Assistant Integration
 
-A Home Assistant custom integration for monitoring [Komodo](https://github.com/mbecker20/komodo) - a self-hosted container and stack management platform. This integration allows you to monitor your Komodo-managed servers, Docker stacks, and alerts directly from your Home Assistant dashboard.
+A Home Assistant custom integration for monitoring your [Komodo](https://github.com/mbecker20/komodo) instance. It allows you to monitor your Komodo-managed servers, Docker stacks, and alerts directly from Home Assistant.
 
-## What is Komodo?
+## Capabilities
 
-Komodo is a modern, web-based platform for managing Docker containers and stacks across multiple servers. It provides features like:
-- Multi-server container management
-- Stack deployment and monitoring
-- Alert system for infrastructure issues
-- Container update notifications
-- Resource monitoring
-
-This integration brings Komodo monitoring capabilities into Home Assistant, allowing you to:
-- Track server states (online/offline)
+This integration allows you to:
+- Track server states
 - Monitor Docker stack states
-- View unresolved alerts
-- Get notified about available container updates
+- View unresolved alerts (WiP)
+- Get notified about available container updates and install them (WiP)
 
 ## Installation
 
@@ -72,83 +65,16 @@ The integration will test the connection and create entities for all discovered 
 
 The integration creates several types of entities based on your Komodo configuration:
 
-### Server Sensors
+### Entities
 
 | Entity ID Format | Description | States |
 |------------------|-------------|---------|
 | `sensor.komodo_server_{server_name}_state` | Shows the current state of each server | `Running`, `Stopped`, `Unknown` |
-
-### Stack Sensors
-
-| Entity ID Format | Description | States |
-|------------------|-------------|---------|
 | `sensor.komodo_stack_{stack_name}_state` | Shows the current state of each Docker stack | `Running`, `Stopped`, `Unknown`, `Deploying` |
-
-### Alert Sensors
-
-| Entity ID Format | Description | Value |
-|------------------|-------------|-------|
 | `sensor.komodo_alert_alertcount` | Number of unresolved alerts | Numeric count |
 | `sensor.komodo_alert_alerts` | Types of current alerts | Comma-separated list of alert types |
-
-### Update Entities
-
-| Entity ID Format | Description |
 |------------------|-------------|
 | `update.komodo_{stack_name}_{service_name}` | Shows available updates for container services |
-
-## Usage Examples
-
-### Automations
-
-**Get notified when a server goes offline:**
-```yaml
-automation:
-  - alias: "Komodo Server Offline Alert"
-    trigger:
-      - platform: state
-        entity_id: sensor.komodo_server_production_state
-        to: "Stopped"
-    action:
-      - service: notify.notify
-        data:
-          message: "Production server is offline!"
-```
-
-**Alert on new Komodo alerts:**
-```yaml
-automation:
-  - alias: "Komodo New Alerts"
-    trigger:
-      - platform: numeric_state
-        entity_id: sensor.komodo_alert_alertcount
-        above: 0
-    action:
-      - service: notify.notify
-        data:
-          message: "Komodo has {{ states('sensor.komodo_alert_alertcount') }} unresolved alerts: {{ states('sensor.komodo_alert_alerts') }}"
-```
-
-### Dashboard Cards
-
-**Server Status Card:**
-```yaml
-type: entities
-title: Komodo Servers
-entities:
-  - sensor.komodo_server_production_state
-  - sensor.komodo_server_staging_state
-```
-
-**Stack Overview:**
-```yaml
-type: entities
-title: Docker Stacks
-entities:
-  - sensor.komodo_stack_webapp_state
-  - sensor.komodo_stack_database_state
-  - sensor.komodo_stack_monitoring_state
-```
 
 ## Troubleshooting
 
@@ -166,14 +92,7 @@ entities:
 
 ### Logs
 
-Enable debug logging by adding this to your `configuration.yaml`:
-
-```yaml
-logger:
-  logs:
-    custom_components.komodo: debug
-    komodo_api: debug
-```
+Enable debug logging on the integrations page before creating an issue.
 
 ## Support
 
