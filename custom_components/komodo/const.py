@@ -26,32 +26,34 @@ def normalize_host_url(host: str) -> str:
     if host.startswith(('http://', 'https://')):
         return host
     
-    # Default to HTTPS for security, but allow HTTP for localhost/private IPs
-    # RFC 1918 private IP ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
-    # Plus localhost and 127.0.0.0/8
-    is_private = (
-        host.startswith('localhost') or 
-        host.startswith('127.') or 
-        host.startswith('192.168.') or 
-        host.startswith('10.') or
-        # 172.16.0.0/12 (172.16.0.0 to 172.31.255.255)
-        (host.startswith('172.') and _is_172_private(host))
-    )
-    
-    if is_private:
+    # Use HTTP for all IP addresses, HTTPS for domain names
+    if _is_ip_address(host):
         return f"http://{host}"
     else:
         return f"https://{host}"
 
 
-def _is_172_private(host: str) -> bool:
-    """Check if a host starting with 172. is in the private range 172.16.0.0/12."""
+def _is_ip_address(host: str) -> bool:
+    """Check if the host is an IP address (IPv4 or IPv6)."""
+    import ipaddress
+    
     try:
-        # Extract the second octet to check if it's in range 16-31
-        parts = host.split('.')
-        if len(parts) >= 2:
-            second_octet = int(parts[1].split(':')[0])  # Handle port numbers
-            return 16 <= second_octet <= 31
-    except (ValueError, IndexError):
-        pass
-    return False
+        # For IPv6, we need to handle bracket notation and ports differently
+        if '[' in host and ']' in host:
+            # IPv6 with brackets: [::1]:8080
+            ip_part = host.split(']')[0][1:]  # Extract between brackets
+        elif ':' in host and host.count(':') > 1:
+            # Likely IPv6 without brackets
+            ip_part = host
+        else:
+            # IPv4 or IPv6 with port: 192.168.1.1:8080
+            ip_part = host.split(':')[0]
+        
+        # Try to parse as IP address
+        ipaddress.ip_address(ip_part)
+        return True
+    except ValueError:
+        # Also check for localhost
+        return host.startswith('localhost')
+    except Exception:
+        return False
