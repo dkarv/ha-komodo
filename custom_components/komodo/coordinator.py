@@ -16,25 +16,29 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 # Arrange servers into a mapping where the key is the name property
-def arrange_servers_by_name(servers: ListServersResponse) -> Mapping[str, ServerListItem]:
+def arrange_servers_by_name(servers: ListServersResponse | None) -> Mapping[str, ServerListItem]:
+    if servers is None:
+        return {}
     return {server.name: server for server in servers if hasattr(server, "name")}
 
 # Arrange stacks into a mapping where the key is the name property
-def arrange_stacks_by_name(stacks: ListStacksResponse) -> Mapping[str, StackListItem]:
+def arrange_stacks_by_name(stacks: ListStacksResponse | None) -> Mapping[str, StackListItem]:
+    if stacks is None:
+        return {}
     return {stack.name: stack for stack in stacks if hasattr(stack, "name")}
 
 class KomodoData:
-    servers: Mapping[str, ServerListItem]
-    stacks: Mapping[str, StackListItem]
-    alerts: ListAlertsResponse
+    servers: Mapping[str, ServerListItem] | None
+    stacks: Mapping[str, StackListItem] | None
+    alerts: ListAlertsResponse | None
     # (stack, service) -> details
-    services: Mapping[tuple[str, str], InspectStackContainerResponse]
+    services: Mapping[tuple[str, str], InspectStackContainerResponse] | None
 
     def __init__(self, 
-                 servers: ListServersResponse, 
-                 stacks: ListStacksResponse, 
-                 alerts: ListAlertsResponse, 
-                 services: Mapping[tuple[str, str], InspectStackContainerResponse],
+                 servers: ListServersResponse | None, 
+                 stacks: ListStacksResponse | None, 
+                 alerts: ListAlertsResponse | None, 
+                 services: Mapping[tuple[str, str], InspectStackContainerResponse] | None,
                  ):
         self.alerts = alerts
         self.servers = arrange_servers_by_name(servers)
@@ -72,11 +76,23 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                     query = { 'resolved': False },
                 )),
             ]
-            responses = await asyncio.gather(*tasks)
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            servers = responses[0] if not isinstance(responses[0], Exception) else None
+            stacks = responses[1] if not isinstance(responses[1], Exception) else None
+            alerts = responses[2] if not isinstance(responses[2], Exception) else None
+            if servers is None:
+                _LOGGER.error("Failed to fetch servers: %s", exc_info = responses[0])
 
-            services_mapping = await self._query_services(responses[1])
+            if stacks is None:
+                _LOGGER.error("Failed to fetch stacks: %s", exc_info = responses[1])
+                services_mapping = None
+            else:
+                services_mapping = await self._query_services(stacks)
+
+            if alerts is None:
+                _LOGGER.error("Failed to fetch alerts: %s", exc_info = responses[2])
             
-            return KomodoData(responses[0], responses[1], responses[2], services_mapping)
+            return KomodoData(servers, stacks, alerts, services_mapping)
     
     async def _query_services(self, stacks: ListStacksResponse) -> Mapping[tuple[str, str], InspectStackContainerResponse]:
         
