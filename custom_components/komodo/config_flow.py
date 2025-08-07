@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from aiohttp import ClientConnectionError
 
-from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET
+from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET, normalize_host_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +36,8 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     Data has the keys from _komodo_schema with values provided by the user.
     """
-    async with KomodoClient(data[CONF_HOST], ApiKeyInitOptions(data[CONF_API_KEY], data[CONF_API_SECRET])) as api:
+    normalized_host = normalize_host_url(data[CONF_HOST])
+    async with KomodoClient(normalized_host, ApiKeyInitOptions(data[CONF_API_KEY], data[CONF_API_SECRET])) as api:
        await api.read.getVersion(GetVersion())
 
     # Return info that you want to store in the config entry.
@@ -57,7 +58,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
-                return self.async_create_entry(title=info["title"], data=user_input)
+                # Store the normalized host URL in the config entry
+                normalized_data = user_input.copy()
+                normalized_data[CONF_HOST] = normalize_host_url(user_input[CONF_HOST])
+                return self.async_create_entry(title=info["title"], data=normalized_data)
             except ClientConnectionError:
                 _LOGGER.exception("Connection error setting up the Komodo api")
                 errors["base"] = "cannot_connect"
@@ -87,7 +91,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 await validate_input(self.hass, user_input)
-                self.hass.config_entries.async_update_entry(current, data=user_input)
+                # Store the normalized host URL in the config entry
+                normalized_data = user_input.copy()
+                normalized_data[CONF_HOST] = normalize_host_url(user_input[CONF_HOST])
+                self.hass.config_entries.async_update_entry(current, data=normalized_data)
                 await self.hass.config_entries.async_reload(current.entry_id)
                 return self.async_abort(reason="reconfiguration_successful")
 #            except TODO:
