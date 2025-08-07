@@ -100,11 +100,9 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         services_mapping = {}
         detail_tasks = {}
 
-        # Check which services need to be queried
+        # Check which services need to be queried - query all services to ensure update entities work properly
         for stack in stacks:
             for service in stack.info.services:
-                if not service.update_available:
-                    continue
                 key = (stack.name, service.service)
                 # Check if we have previous data and it's not older than 2 hours (7200 seconds)
                 prev_data = None
