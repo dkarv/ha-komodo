@@ -11,6 +11,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from aiohttp import ClientConnectionError
+from aiohttp.client_exceptions import NonHttpUrlClientError
 
 from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET
 
@@ -24,11 +25,18 @@ def _komodo_schema(
         api_secret: str | None = None,
 ): return vol.Schema(
     {
-        vol.Required(CONF_HOST, default=host): str,
+        vol.Required(CONF_HOST, default=host, description={"suggested_value": "http://192.168.1.100:9120"}): str,
         vol.Required(CONF_API_KEY, default=api_key): str,
         vol.Required(CONF_API_SECRET, default=api_secret): str,
     }
 )
+
+
+def _normalize_host_url(host: str) -> str:
+    """Normalize the host URL by adding http:// if no schema is present."""
+    if not host.startswith(("http://", "https://")):
+        return f"http://{host}"
+    return host
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -36,7 +44,10 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     Data has the keys from _komodo_schema with values provided by the user.
     """
-    async with KomodoClient(data[CONF_HOST], ApiKeyInitOptions(data[CONF_API_KEY], data[CONF_API_SECRET])) as api:
+    # Normalize the host URL to ensure it has a proper schema
+    normalized_host = _normalize_host_url(data[CONF_HOST])
+    
+    async with KomodoClient(normalized_host, ApiKeyInitOptions(data[CONF_API_KEY], data[CONF_API_SECRET])) as api:
        await api.read.getVersion(GetVersion())
 
     # Return info that you want to store in the config entry.
@@ -56,9 +67,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
+                # Normalize the host URL before validation and storage
+                user_input[CONF_HOST] = _normalize_host_url(user_input[CONF_HOST])
                 info = await validate_input(self.hass, user_input)
                 return self.async_create_entry(title=info["title"], data=user_input)
-            except ClientConnectionError:
+            except (ClientConnectionError, NonHttpUrlClientError):
                 _LOGGER.exception("Connection error setting up the Komodo api")
                 errors["base"] = "cannot_connect"
             except KomodoException as e:
