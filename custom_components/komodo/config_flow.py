@@ -13,6 +13,7 @@ from homeassistant.data_entry_flow import FlowResult
 from aiohttp import ClientConnectionError
 
 from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET
+from .utils import fix_host
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,11 +37,12 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     Data has the keys from _komodo_schema with values provided by the user.
     """
-    async with KomodoClient(data[CONF_HOST], ApiKeyInitOptions(data[CONF_API_KEY], data[CONF_API_SECRET])) as api:
+    fixed_host = fix_host(data[CONF_HOST])
+    async with KomodoClient(fixed_host, ApiKeyInitOptions(data[CONF_API_KEY], data[CONF_API_SECRET])) as api:
        await api.read.getVersion(GetVersion())
 
     # Return info that you want to store in the config entry.
-    return {"title": "Komodo"}
+    return {"host": fixed_host, "title": "Komodo"}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -57,6 +59,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
+                user_input[CONF_HOST] = info["host"]
                 return self.async_create_entry(title=info["title"], data=user_input)
             except ClientConnectionError:
                 _LOGGER.exception("Connection error setting up the Komodo api")
@@ -86,7 +89,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
-                await validate_input(self.hass, user_input)
+                info = await validate_input(self.hass, user_input)
+                user_input[CONF_HOST] = info["host"]
                 self.hass.config_entries.async_update_entry(current, data=user_input)
                 await self.hass.config_entries.async_reload(current.entry_id)
                 return self.async_abort(reason="reconfiguration_successful")
