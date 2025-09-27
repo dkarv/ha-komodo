@@ -7,7 +7,7 @@ import logging
 
 from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, HomeAssistantError
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -60,6 +60,9 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
         entity_id = f"update_{stack}_{service}"
         self.entity_id = f"update.{DOMAIN}_{entity_id}"
         self._attr_unique_id = f"{id}_{entity_id}"
+        self._attr_title = f"{self._stack} - {self._service}"
+        self._attr_latest_version = self._find_latest_version()
+        self._attr_installed_version = self._find_installed_version()
     
     def _find_service(self) -> StackServiceWithUpdate | None:
         """Find the service in the coordinator data."""
@@ -72,14 +75,7 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
         """Find the version details for the service."""
         return self.coordinator.data.services.get((self._stack, self._service))
 
-    
-    @property
-    def title(self) -> str | None:
-        """Return the name."""
-        return f"{self._stack} - {self._service}"
-
-    @property
-    def latest_version(self) -> str:
+    def _find_latest_version(self) -> str:
         """Return latest version of the entity."""
         service = self._find_service()
         if service and service.update_available:
@@ -93,8 +89,7 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
 #            return f"https://github.com/{self.repository.data.full_name}"
 #        return f"https://github.com/{self.repository.data.full_name}/releases/{self.latest_version}"
 
-    @property
-    def installed_version(self) -> str:
+    def _find_installed_version(self) -> str:
         """Return downloaded version of the entity."""
         details = self._find_version()
         if details and details.config and details.config.labels:
@@ -110,3 +105,10 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
     async def async_release_notes(self) -> str | None:
         """Return the release notes."""
         return "Release notes"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._attr_latest_version = self._find_latest_version()
+        self._attr_installed_version = self._find_installed_version()
+        self.async_write_ha_state()
