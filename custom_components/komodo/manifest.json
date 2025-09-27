@@ -9,7 +9,7 @@
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/dkarv/ha-komodo/issues",
-  "requirements": ["komodo-api==1.18.4"],
+  "requirements": ["komodo-api==1.19.4"],
   "ssdp": [],
   "version": "0.0.3",
   "zeroconf": []
