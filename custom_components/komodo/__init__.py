@@ -12,7 +12,7 @@ from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET
 from .base import KomodoBase
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.UPDATE]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.UPDATE, Platform.BUTTON]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
