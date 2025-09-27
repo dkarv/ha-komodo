@@ -33,4 +33,3 @@ async def wait_for_completion(client: KomodoClient, update: Update, title: str):
         logs = "\n".join(f"[{log.stage}] {log.stderr} {log.stdout}" for log in update.logs)
         _LOGGER.error("%s failed. Logs:\n%s", title, logs)
     return update
-
