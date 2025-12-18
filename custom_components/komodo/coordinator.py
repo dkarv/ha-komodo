@@ -81,16 +81,16 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             stacks = responses[1] if not isinstance(responses[1], Exception) else None
             alerts = responses[2] if not isinstance(responses[2], Exception) else None
             if servers is None:
-                _LOGGER.error("Failed to fetch servers: %s", exc_info = responses[0])
+                _LOGGER.error("Failed to fetch servers", exc_info = responses[0])
 
             if stacks is None:
-                _LOGGER.error("Failed to fetch stacks: %s", exc_info = responses[1])
+                _LOGGER.error("Failed to fetch stacks", exc_info = responses[1])
                 services_mapping = None
             else:
                 services_mapping = await self._query_services(stacks)
 
             if alerts is None:
-                _LOGGER.error("Failed to fetch alerts: %s", exc_info = responses[2])
+                _LOGGER.error("Failed to fetch alerts", exc_info = responses[2])
             
             return KomodoData(servers, stacks, alerts, services_mapping)
     
