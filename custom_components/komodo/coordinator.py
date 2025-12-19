@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from datetime import timedelta
 from typing import Mapping
 
 from komodo_api.types import InspectStackContainer, InspectStackContainerResponse
@@ -56,6 +57,7 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             _LOGGER,
             # Name of the data. For logging purposes.
             name="KomodoData",
+            update_interval=timedelta(minutes=5)
         )
         self.my_api = my_api
         self._service_timestamps: dict[tuple[str, str], float] = {}
