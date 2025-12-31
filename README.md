@@ -7,8 +7,8 @@ A Home Assistant custom integration for monitoring your [Komodo](https://github.
 This integration allows you to:
 - Track server states
 - Monitor Docker stack states
+- Get notified about available container updates and install them
 - View unresolved alerts (WiP)
-- Get notified about available container updates and install them (WiP)
 
 ## Installation
 
