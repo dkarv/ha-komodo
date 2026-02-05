@@ -1,0 +1,12 @@
+{
+	"image": "homeassistant/home-assistant:2026.2",
+	"appPort": [
+		8123
+	],
+	"overrideCommand": false,
+	"postCreateCommand": "pip install -r requirements.txt",
+	"mounts": [
+		"source=${localWorkspaceFolder}/.devcontainer/.config,target=/config,type=bind,consistency=cached",
+		"source=${localWorkspaceFolder}/custom_components,target=/config/custom_components,type=bind,consistency=cached"
+	]
+}
