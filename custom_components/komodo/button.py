@@ -16,7 +16,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     try:
         procedures: ListProceduresResponse = await komodo.api.read.listProcedures(ListProcedures())
-    except Exception as e:
+    except Exception:
         return
 
     entities = [
@@ -34,7 +34,7 @@ class KomodoProcedureButton(ButtonEntity):
         self._procedure = procedure
         entity_id = f"button_{procedure.id}"
         self.entity_id = f"button.{DOMAIN}_{entity_id}"
-        self._attr_unique_id = f"{id}_{entity_id}"      
+        self._attr_unique_id = f"{id}_{entity_id}"
         self._attr_name = f"Procedure {procedure.name}"
 
     async def async_press(self) -> None:

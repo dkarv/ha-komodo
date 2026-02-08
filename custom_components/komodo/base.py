@@ -1,7 +1,7 @@
 from komodo_api.lib import KomodoClient, ApiKeyInitOptions
 from komodo_api.types import GetVersion
-from .coordinator import KomodoCoordinator
 from homeassistant.core import HomeAssistant
+from .coordinator import KomodoCoordinator
 
 class KomodoBase:
     api: KomodoClient
