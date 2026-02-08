@@ -11,6 +11,6 @@
   "issue_tracker": "https://github.com/dkarv/ha-komodo/issues",
   "requirements": ["komodo-api==1.19.5"],
   "ssdp": [],
-  "version": "0.9.2",
+  "version": "1.0.0-beta",
   "zeroconf": []
 }
