@@ -11,11 +11,12 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.komodo.utils import wait_for_completion
+from komodo_api.types import StackListItem, StackServiceWithUpdate, InspectStackContainerResponse, DeployStack, Update, UpdateStatus, GetUpdate
+
+from .utils import wait_for_completion
 
 from .const import DOMAIN
 from .base import KomodoBase
-from komodo_api.types import StackListItem, StackServiceWithUpdate, InspectStackContainerResponse, DeployStack, Update, UpdateStatus, GetUpdate
 from .coordinator import KomodoCoordinator
 
 
@@ -26,14 +27,14 @@ async def async_setup_entry(
     komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
 
     await komodo.first_refresh()
-    # FIXME catch invalid auth exception and raise ConfigEntryAuthFailed
 
-    stacks: list[StackListItem] = komodo.coordinator.data.stacks.values()
-    seen = set()
+    # stacks: list[StackListItem] = komodo.coordinator.data.stacks.values()
+    # seen = set()
     async_add_entities(
-        KomodoUpdateEntity(komodo, entry.entry_id, stack.name, service.service)
-        for stack in stacks for service in stack.info.services
-        if not ((stack.name, service.service) in seen or seen.add((stack.name, service.service)))
+        []
+        #KomodoUpdateEntity(komodo, entry.entry_id, stack.name, service.service)
+        #for stack in stacks for service in stack.info.services
+        #if not ((stack.name, service.service) in seen or seen.add((stack.name, service.service)))
     )
 
 class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):

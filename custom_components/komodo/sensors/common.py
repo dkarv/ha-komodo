@@ -7,6 +7,7 @@ from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.helpers.entity import Entity
 from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from ..const import DOMAIN
 from ..coordinator import KomodoCoordinator
@@ -18,37 +19,33 @@ class KomodoEntity(CoordinatorEntity[KomodoCoordinator], Entity):
 
     def __init__(
         self,
-        id,
+        item_id,
         coordinator,
         extractor,
-        category: str,
         key: str,
-        name: str | None,
+        device_info: DeviceInfo,
     ) -> None:
         """Initialize the common functionality."""
         super().__init__(coordinator)
         self._extractor = extractor
-        self._attr_translation_key = f"{category}_{key}"
+        self._attr_translation_key = key
         self._attr_has_entity_name = True
-        name_part = "" if name is None else f"_{name}"
-        entity_id = f"{category}{name_part}_{key}"
-        self.entity_id = f"sensor.{DOMAIN}_{entity_id}"
-        self._attr_unique_id = f"{id}_{entity_id}"
+        self._attr_unique_id = f"{item_id}_{key}"
+        self._attr_device_info = device_info
 
 class KomodoSensor(KomodoEntity, SensorEntity):
     """Basic sensor with common functionality."""
 
     def __init__(
         self,
-        id,
+        item_id,
         coordinator,
         extractor,
-        category: str,
         key: str,
-        name: str | None,
+        device_info: DeviceInfo,
     ) -> None:
         """Initialize the sensor with the common coordinator."""
-        KomodoEntity.__init__(self, id=id, coordinator=coordinator, extractor=extractor, category=category, key=key, name=name)
+        KomodoEntity.__init__(self, item_id=item_id, coordinator=coordinator, extractor=extractor, key=key, device_info=device_info )
         self._attr_native_value = self._extractor(self.coordinator.data)
 
     @callback
@@ -65,15 +62,14 @@ class KomodoBinarySensor(KomodoEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        id,
+        item_id,
         coordinator,
         extractor,
-        category: str,
         key: str,
-        name: str,
+        device_info: DeviceInfo,
     ) -> None:
         """Initialize the sensor with the coordinator."""
-        KomodoEntity.__init__(self, id=id, coordinator=coordinator, extractor=extractor, category=category, key=key, name=name)
+        KomodoEntity.__init__(self, item_id=item_id, coordinator=coordinator, extractor=extractor, key=key, device_info=device_info)
         self.is_on = self._extractor(self.coordinator.data)
 
     @callback
@@ -90,15 +86,14 @@ class KomodoOptionSensor(KomodoSensor):
 
     def __init__(
         self,
-        id,
+        item_id,
         coordinator,
         extractor,
-        category: str,
         key: str,
-        name: str | None,
+        device_info: DeviceInfo,
         options: list[str],
     ) -> None:
         """Initialize the parent sensor."""
         self._attr_device_class = SensorDeviceClass.ENUM
         self._attr_options = options
-        super().__init__(id=id, coordinator=coordinator, extractor=extractor, category=category, key=key, name=name)
+        super().__init__(item_id=item_id, coordinator=coordinator, extractor=extractor, key=key, device_info=device_info)

@@ -8,6 +8,8 @@ def create_alert_sensors(
     """
     Returns a list of sensors.
     """
+    return []
+    # FIXME
     if coordinator.data.alerts is None:
         return []
     return [
