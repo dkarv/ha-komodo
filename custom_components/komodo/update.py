@@ -6,13 +6,12 @@ from typing import Any
 from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from komodo_api.types import DeployStack, Update
 
-from .utils import wait_for_completion
+from .utils import wait_for_completion, create_stack_device_info
 
 from .const import DOMAIN
 from .base import KomodoBase
@@ -91,12 +90,7 @@ def create_update_entities_for_services(
     entities: list[KomodoUpdateEntity] = []
     
     for stack in coordinator.data.stacks.values():
-        device_info = DeviceInfo(
-            identifiers={(DOMAIN, stack.id)},
-            name=stack.name,
-            manufacturer="Komodo",
-            via_device=(DOMAIN, stack.server_id),
-        )
+        device_info = create_stack_device_info(stack.id, stack.name, stack.server_id, DOMAIN)
 
         for service in stack.services.values():
             entity = KomodoUpdateEntity(

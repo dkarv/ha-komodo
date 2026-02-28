@@ -1,9 +1,8 @@
 from ..coordinator import KomodoCoordinator
 from .common import KomodoSensor, KomodoOptionSensor, KomodoEntity
 from komodo_api.types import StackState
-from homeassistant.components.update import UpdateEntity
-from homeassistant.helpers.device_registry import DeviceInfo
 from ..const import DOMAIN
+from ..utils import create_stack_device_info
 
 def create_stack_sensors(
     coordinator: KomodoCoordinator, 
@@ -14,12 +13,7 @@ def create_stack_sensors(
     """
     sensors: list[KomodoSensor] = []
     for stack in coordinator.data.stacks.values():
-        device_info = DeviceInfo(
-            identifiers={(DOMAIN, stack.id)},
-            name=stack.name,
-            manufacturer="Komodo",
-            via_device=(DOMAIN, stack.server_id),
-        )
+        device_info = create_stack_device_info(stack.id, stack.name, stack.server_id, DOMAIN)
 
         item_id = f"{entry_id}_{stack.id}"
 
