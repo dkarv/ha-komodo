@@ -32,6 +32,5 @@ def create_alert_sensors(
             item_id=f"{entry_id}_global",
             extractor=joiner,
             key="alert_list",
-        )
+        ),
     ]
-

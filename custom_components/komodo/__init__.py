@@ -19,7 +19,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Komodo from a config entry."""
 
     hass.data.setdefault(DOMAIN, {})
-    komodo = KomodoBase(hass, entry.data[CONF_HOST], ApiKeyInitOptions(entry.data[CONF_API_KEY], entry.data[CONF_API_SECRET]))
+    komodo = KomodoBase(
+        hass,
+        entry.data[CONF_HOST],
+        ApiKeyInitOptions(entry.data[CONF_API_KEY], entry.data[CONF_API_SECRET]),
+    )
     try:
         await komodo.test_connection()
     except Exception as e:

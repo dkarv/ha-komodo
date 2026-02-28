@@ -26,10 +26,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .data.komodo_data import KomodoData
-from .data.stack import  KomodoStack
+from .data.stack import KomodoStack
 from .data.service import KomodoService, KomodoUpdateInfo
 
 _LOGGER = logging.getLogger(__name__)
+
 
 class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
     """Komodo coordinator."""
@@ -75,7 +76,7 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 _LOGGER.error("Error fetching servers", exc_info=responses[0])
             else:
                 data.add_servers(responses[0])
-            
+
             # Stacks
             if isinstance(responses[1], Exception):
                 _LOGGER.error("Error fetching stacks", exc_info=responses[1])
@@ -92,36 +93,66 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         # Fetch details for services
         await self._list_services(data)
         return data
-    
+
     async def _list_services(self, data: KomodoData):
         """Fetch services for each stack."""
         tasks = {}
         for stack_id in data.stacks.keys():
-            tasks[stack_id] = self.my_api.read.listStackServices(ListStackServices(stack=stack_id))
-        
+            tasks[stack_id] = self.my_api.read.listStackServices(
+                ListStackServices(stack=stack_id)
+            )
+
         if tasks:
             responses = await asyncio.gather(*tasks.values(), return_exceptions=True)
             for stack_id, response in zip(tasks.keys(), responses):
                 if isinstance(response, Exception):
-                    _LOGGER.error("Error fetching services for stack %s", stack_id, exc_info=response)
+                    _LOGGER.error(
+                        "Error fetching services for stack %s",
+                        stack_id,
+                        exc_info=response,
+                    )
                 else:
                     previous_stack = self.data.stacks[stack_id] if self.data else None
-                    services = await self._inspect_services_if_needed(response, stack_id, previous_stack)
+                    services = await self._inspect_services_if_needed(
+                        response, stack_id, previous_stack
+                    )
                     data.add_services(stack_id, services)
-    
-    async def _inspect_services_if_needed(self, services: List[StackService], stack_id: str, previous_stack: KomodoStack | None) -> list[KomodoService]:
+
+    async def _inspect_services_if_needed(
+        self,
+        services: List[StackService],
+        stack_id: str,
+        previous_stack: KomodoStack | None,
+    ) -> list[KomodoService]:
         infos = []
         now = time.time()
         for service in services:
             if not service.update_available:
                 infos.append(KomodoService(service))
             else:
-                previous_service = previous_stack.services.get(service.service) if previous_stack else None
-                previous_update_info = previous_service.update_info if previous_service else None
-                if previous_update_info and (now - previous_update_info.info.info_updated_at) < 7200:
+                previous_service = (
+                    previous_stack.services.get(service.service)
+                    if previous_stack
+                    else None
+                )
+                previous_update_info = (
+                    previous_service.update_info if previous_service else None
+                )
+                if (
+                    previous_update_info
+                    and (now - previous_update_info.info.info_updated_at) < 7200
+                ):
                     infos.append(KomodoService(service, previous_update_info))
                 else:
-                    _LOGGER.debug("Inspecting service %s in stack %s for update", service.service, stack_id)
-                    response = await self.my_api.read.inspectStackContainer(InspectStackContainer(stack=stack_id, service=service.service))
-                    infos.append(KomodoService(service, KomodoUpdateInfo(response, now)))
+                    _LOGGER.debug(
+                        "Inspecting service %s in stack %s for update",
+                        service.service,
+                        stack_id,
+                    )
+                    response = await self.my_api.read.inspectStackContainer(
+                        InspectStackContainer(stack=stack_id, service=service.service)
+                    )
+                    infos.append(
+                        KomodoService(service, KomodoUpdateInfo(response, now))
+                    )
         return infos

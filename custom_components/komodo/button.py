@@ -3,7 +3,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 
-from komodo_api.types import ListProcedures, ListProceduresResponse, ResourceListItem, ProcedureListItemInfo, RunProcedure
+from komodo_api.types import (
+    ListProcedures,
+    ListProceduresResponse,
+    ResourceListItem,
+    ProcedureListItemInfo,
+    RunProcedure,
+)
 from komodo_api.lib import KomodoClient
 
 from custom_components.komodo.base import KomodoBase
@@ -15,11 +21,15 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+):
     komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
 
     try:
-        procedures: ListProceduresResponse = await komodo.api.read.listProcedures(ListProcedures())
+        procedures: ListProceduresResponse = await komodo.api.read.listProcedures(
+            ListProcedures()
+        )
     except Exception:
         return
 
@@ -29,11 +39,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ]
     async_add_entities(entities)
 
+
 class KomodoProcedureButton(ButtonEntity):
-    def __init__(self, 
-                 api: KomodoClient, 
-                 id: str,
-                 procedure: ResourceListItem[ProcedureListItemInfo]):
+    def __init__(
+        self,
+        api: KomodoClient,
+        id: str,
+        procedure: ResourceListItem[ProcedureListItemInfo],
+    ):
         self._api = api
         self._procedure = procedure
         entity_id = f"button_{procedure.id}"
@@ -43,6 +56,10 @@ class KomodoProcedureButton(ButtonEntity):
 
     async def async_press(self) -> None:
         _LOGGER.info("Starting procedure %s", self._procedure.name)
-        update = await self._api.execute.runProcedure(RunProcedure(procedure = self._procedure.id))
-        update = await wait_for_completion(self._api, update, f"Procedure {self._procedure.name}")
+        update = await self._api.execute.runProcedure(
+            RunProcedure(procedure=self._procedure.id)
+        )
+        update = await wait_for_completion(
+            self._api, update, f"Procedure {self._procedure.name}"
+        )
         _LOGGER.info("Completed procedure %s", self._procedure.name)

@@ -6,7 +6,7 @@ from ..const import DOMAIN
 
 
 def create_server_sensors(
-    coordinator: KomodoCoordinator, 
+    coordinator: KomodoCoordinator,
     entry_id: str,
 ) -> list[KomodoSensor]:
     """Return a list of sensors, one device per server."""
@@ -47,7 +47,7 @@ def create_server_sensors(
                 extractor=joiner,
                 key="alert_list",
                 device_info=device_info,
-            ) 
+            )
         )
 
     return sensors

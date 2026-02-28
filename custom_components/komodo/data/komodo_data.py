@@ -1,4 +1,3 @@
-
 # Arrange servers into a mapping where the key is the name property
 from typing import Mapping, Optional, List
 
@@ -16,8 +15,10 @@ from komodo_api.types import (
     ListStackServicesResponse,
 )
 
+
 class KomodoData:
     """Wrapper to represent all data fetched from the API."""
+
     servers: Mapping[str, KomodoServer] = {}
     stacks: Mapping[str, KomodoStack] = {}
     alert_count: Optional[int] = None
@@ -27,7 +28,7 @@ class KomodoData:
         """Add servers from response."""
         for server in servers:
             self.servers[server.id] = KomodoServer(server)
-    
+
     def get_server(self, server_id: str) -> KomodoServer:
         """Get server by ID."""
         server = self.servers[server_id]
@@ -42,7 +43,7 @@ class KomodoData:
         """
         for _stack in stacks:
             self.stacks[_stack.id] = KomodoStack(_stack)
-    
+
     def get_stack(self, stack_id: str) -> KomodoStack:
         """Get stack by ID."""
         stack = self.stacks[stack_id]
@@ -61,9 +62,11 @@ class KomodoData:
             elif isinstance(alert.target, ResourceTargetStack):
                 self.get_stack(alert.target.id).add_alert(alert)
 
-    def add_services(self, stack_id: str, 
-                     services: List[KomodoService],
-                     ):
+    def add_services(
+        self,
+        stack_id: str,
+        services: List[KomodoService],
+    ):
         """Add services for a stack from response."""
         stack = self.get_stack(stack_id)
 

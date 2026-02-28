@@ -14,6 +14,7 @@ from ..coordinator import KomodoCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class KomodoEntity(CoordinatorEntity[KomodoCoordinator], Entity):
     """Basic entity with common functionality."""
 
@@ -33,6 +34,7 @@ class KomodoEntity(CoordinatorEntity[KomodoCoordinator], Entity):
         self._attr_unique_id = f"{item_id}_{key}"
         self._attr_device_info = device_info
 
+
 class KomodoSensor(KomodoEntity, SensorEntity):
     """Basic sensor with common functionality."""
 
@@ -45,7 +47,14 @@ class KomodoSensor(KomodoEntity, SensorEntity):
         device_info: DeviceInfo | None = None,
     ) -> None:
         """Initialize the sensor with the common coordinator."""
-        KomodoEntity.__init__(self, item_id=item_id, coordinator=coordinator, extractor=extractor, key=key, device_info=device_info )
+        KomodoEntity.__init__(
+            self,
+            item_id=item_id,
+            coordinator=coordinator,
+            extractor=extractor,
+            key=key,
+            device_info=device_info,
+        )
         self._attr_native_value = self._extractor(self.coordinator.data)
 
     @callback
@@ -69,7 +78,14 @@ class KomodoBinarySensor(KomodoEntity, BinarySensorEntity):
         device_info: DeviceInfo,
     ) -> None:
         """Initialize the sensor with the coordinator."""
-        KomodoEntity.__init__(self, item_id=item_id, coordinator=coordinator, extractor=extractor, key=key, device_info=device_info)
+        KomodoEntity.__init__(
+            self,
+            item_id=item_id,
+            coordinator=coordinator,
+            extractor=extractor,
+            key=key,
+            device_info=device_info,
+        )
         self.is_on = self._extractor(self.coordinator.data)
 
     @callback
@@ -96,4 +112,10 @@ class KomodoOptionSensor(KomodoSensor):
         """Initialize the parent sensor."""
         self._attr_device_class = SensorDeviceClass.ENUM
         self._attr_options = options
-        super().__init__(item_id=item_id, coordinator=coordinator, extractor=extractor, key=key, device_info=device_info)
+        super().__init__(
+            item_id=item_id,
+            coordinator=coordinator,
+            extractor=extractor,
+            key=key,
+            device_info=device_info,
+        )

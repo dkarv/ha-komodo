@@ -1,4 +1,5 @@
 """Config flow for BWT Perla integration."""
+
 import logging
 from typing import Any
 
@@ -18,18 +19,18 @@ from .utils import fix_host
 _LOGGER = logging.getLogger(__name__)
 
 
-
 def _komodo_schema(
-        host: str | None = None,
-        api_key: str | None = None,
-        api_secret: str | None = None,
-): return vol.Schema(
-    {
-        vol.Required(CONF_HOST, default=host): str,
-        vol.Required(CONF_API_KEY, default=api_key): str,
-        vol.Required(CONF_API_SECRET, default=api_secret): str,
-    }
-)
+    host: str | None = None,
+    api_key: str | None = None,
+    api_secret: str | None = None,
+):
+    return vol.Schema(
+        {
+            vol.Required(CONF_HOST, default=host): str,
+            vol.Required(CONF_API_KEY, default=api_key): str,
+            vol.Required(CONF_API_SECRET, default=api_secret): str,
+        }
+    )
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -38,8 +39,10 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     Data has the keys from _komodo_schema with values provided by the user.
     """
     fixed_host = fix_host(data[CONF_HOST])
-    async with KomodoClient(fixed_host, ApiKeyInitOptions(data[CONF_API_KEY], data[CONF_API_SECRET])) as api:
-       await api.read.getVersion(GetVersion())
+    async with KomodoClient(
+        fixed_host, ApiKeyInitOptions(data[CONF_API_KEY], data[CONF_API_SECRET])
+    ) as api:
+        await api.read.getVersion(GetVersion())
 
     # Return info that you want to store in the config entry.
     return {"host": fixed_host, "title": "Komodo"}
@@ -49,7 +52,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Komodo."""
 
     VERSION = 1
-
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -75,13 +77,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
 
-        schema = _komodo_schema() if user_input is None else _komodo_schema(
-            user_input[CONF_HOST], user_input[CONF_API_KEY], user_input[CONF_API_SECRET],
+        schema = (
+            _komodo_schema()
+            if user_input is None
+            else _komodo_schema(
+                user_input[CONF_HOST],
+                user_input[CONF_API_KEY],
+                user_input[CONF_API_SECRET],
+            )
         )
-        return self.async_show_form(
-            step_id="user", data_schema=schema, errors=errors
-        )
-    
+        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None):
         """Manual reconfiguration to change a setting."""
@@ -94,20 +99,22 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self.hass.config_entries.async_update_entry(current, data=user_input)
                 await self.hass.config_entries.async_reload(current.entry_id)
                 return self.async_abort(reason="reconfiguration_successful")
-#            except TODO:
-#                _LOGGER.exception("Connection error setting up the Komodo Api")
-#                errors["base"] = "cannot_connect"
-#            except TODO:
-#                _LOGGER.exception("Wrong authentication passed to Komodo api")
-#                errors["base"] = "invalid_auth"
+            #            except TODO:
+            #                _LOGGER.exception("Connection error setting up the Komodo Api")
+            #                errors["base"] = "cannot_connect"
+            #            except TODO:
+            #                _LOGGER.exception("Wrong authentication passed to Komodo api")
+            #                errors["base"] = "invalid_auth"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
 
         return self.async_show_form(
-            step_id="reconfigure", data_schema=_komodo_schema(
-                host=current.data[CONF_HOST], 
+            step_id="reconfigure",
+            data_schema=_komodo_schema(
+                host=current.data[CONF_HOST],
                 api_key=current.data[CONF_API_KEY],
                 api_secret=current.data[CONF_API_SECRET],
-            ), errors=errors
+            ),
+            errors=errors,
         )

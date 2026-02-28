@@ -4,8 +4,9 @@ from komodo_api.types import StackState
 from ..const import DOMAIN
 from ..utils import create_stack_device_info
 
+
 def create_stack_sensors(
-    coordinator: KomodoCoordinator, 
+    coordinator: KomodoCoordinator,
     entry_id: str,
 ) -> list[KomodoSensor]:
     """
@@ -13,7 +14,9 @@ def create_stack_sensors(
     """
     sensors: list[KomodoSensor] = []
     for stack in coordinator.data.stacks.values():
-        device_info = create_stack_device_info(stack.id, stack.name, stack.server_id, DOMAIN)
+        device_info = create_stack_device_info(
+            stack.id, stack.name, stack.server_id, DOMAIN
+        )
 
         item_id = f"{entry_id}_{stack.id}"
 
@@ -44,7 +47,7 @@ def create_stack_sensors(
                 extractor=joiner,
                 key="alert_list",
                 device_info=device_info,
-            ) 
+            )
         )
 
     return sensors

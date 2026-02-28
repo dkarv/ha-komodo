@@ -8,6 +8,7 @@ from typing import List
 
 class KomodoServer:
     """Wrapper for a server list item returned from the API."""
+
     state: ServerState | None
     id: str
     name: str
@@ -30,4 +31,3 @@ class KomodoServer:
         self.state = None
         self.alerts = []
         return self
-
