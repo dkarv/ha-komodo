@@ -1,23 +1,115 @@
 """Update entities for Komodo."""
 
 from __future__ import annotations
-
-from typing import Any
 import logging
-
+from typing import Any
 from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from komodo_api.types import StackListItem, StackServiceWithUpdate, InspectStackContainerResponse, DeployStack, Update, UpdateStatus, GetUpdate
+from komodo_api.types import DeployStack, Update
 
 from .utils import wait_for_completion
 
 from .const import DOMAIN
 from .base import KomodoBase
 from .coordinator import KomodoCoordinator
+from .data.service import KomodoService
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
+    """Update entity for a service in a stack."""
+
+    _attr_supported_features = UpdateEntityFeature.INSTALL
+
+    def __init__(
+        self,
+        coordinator: KomodoCoordinator,
+        item_id: str,
+        stack_id: str,
+        stack_name: str,
+        service_name: str,
+        device_info: DeviceInfo,
+    ) -> None:
+        """Initialize the update entity."""
+        super().__init__(coordinator)
+        self._stack_id = stack_id
+        self._stack_name = stack_name
+        self._service_name = service_name
+        
+        self._attr_unique_id = f"{item_id}_update"
+        self._attr_device_info = device_info
+        self._attr_name = service_name
+        
+        self._update_attrs()
+    
+    def _find_service(self) -> KomodoService | None:
+        """Find the service in the coordinator data."""
+        stack = self.coordinator.data.stacks.get(self._stack_id)
+        if not stack:
+            return None
+        return stack.services.get(self._service_name)
+    
+    def _update_attrs(self) -> None:
+        """Update entity attributes from coordinator data."""
+        service = self._find_service()
+        if service and service.update_info:
+            self._attr_installed_version = service.update_info.current_version
+            self._attr_latest_version = service.update_info.new_version
+        else:
+            self._attr_installed_version = "0"
+            self._attr_latest_version = "0"
+
+    async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
+        """Install an update."""
+        update: Update = await self.coordinator.my_api.execute.deployStack(
+            DeployStack(stack=self._stack_id, services=[self._service_name])
+        )
+        update = await wait_for_completion(
+            self.coordinator.my_api, 
+            update, 
+            f"Update of {self._stack_name}/{self._service_name}"
+        )
+        await self.coordinator.async_refresh()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._update_attrs()
+        self.async_write_ha_state()
+
+def create_update_entities_for_services(
+    coordinator: KomodoCoordinator,
+    entry_id: str,
+) -> list[KomodoUpdateEntity]:
+    """Create update entities for each service in each stack."""
+    entities: list[KomodoUpdateEntity] = []
+    
+    for stack in coordinator.data.stacks.values():
+        device_info = DeviceInfo(
+            identifiers={(DOMAIN, stack.id)},
+            name=stack.name,
+            manufacturer="Komodo",
+            via_device=(DOMAIN, stack.server_id),
+        )
+
+        for service in stack.services.values():
+            entity = KomodoUpdateEntity(
+                coordinator=coordinator,
+                item_id = f"{entry_id}_{stack.id}_{service.name}",
+                stack_id=stack.id,
+                stack_name=stack.name,
+                service_name=service.name,
+                device_info=device_info,
+            )
+            entities.append(entity)
+    
+    return entities
 
 
 async def async_setup_entry(
@@ -28,88 +120,5 @@ async def async_setup_entry(
 
     await komodo.first_refresh()
 
-    # stacks: list[StackListItem] = komodo.coordinator.data.stacks.values()
-    # seen = set()
-    async_add_entities(
-        []
-        #KomodoUpdateEntity(komodo, entry.entry_id, stack.name, service.service)
-        #for stack in stacks for service in stack.info.services
-        #if not ((stack.name, service.service) in seen or seen.add((stack.name, service.service)))
-    )
-
-class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
-
-    _attr_supported_features = (
-        UpdateEntityFeature.INSTALL #| UpdateEntityFeature.RELEASE_NOTES
-    )
-    _komodo: KomodoBase
-    _stack: str
-    _service: str
-
-    def __init__(
-        self,
-        komodo: KomodoBase,
-        id: str,
-        stack: str,
-        service: str,
-    ) -> None:
-        """Initialize the update entity."""
-        super().__init__(komodo.coordinator)
-        self._komodo = komodo
-        self._stack = stack
-        self._service = service
-        entity_id = f"update_{stack}_{service}"
-        self.entity_id = f"update.{DOMAIN}_{entity_id}"
-        self._attr_unique_id = f"{id}_{entity_id}"
-        self._attr_title = f"{self._stack} - {self._service}"
-        self._attr_latest_version = self._find_latest_version()
-        self._attr_installed_version = self._find_installed_version()
-    
-    def _find_service(self) -> StackServiceWithUpdate | None:
-        """Find the service in the coordinator data."""
-        stack = self.coordinator.data.stacks.get(self._stack)
-        if not stack:
-            return None
-        return next((s for s in stack.info.services if s.service == self._service), None)
-    
-    def _find_version(self) -> InspectStackContainerResponse | None:
-        """Find the version details for the service."""
-        return self.coordinator.data.services.get((self._stack, self._service))
-
-    def _find_latest_version(self) -> str:
-        """Return latest version of the entity."""
-        service = self._find_service()
-        if service and service.update_available:
-            return "update available"
-        return "0"
-
-#    @property
-#    def release_url(self) -> str:
-#        """Return the URL of the release page."""
-#        if self.repository.display_version_or_commit == "commit":
-#            return f"https://github.com/{self.repository.data.full_name}"
-#        return f"https://github.com/{self.repository.data.full_name}/releases/{self.latest_version}"
-
-    def _find_installed_version(self) -> str:
-        """Return downloaded version of the entity."""
-        details = self._find_version()
-        if details and details.config and details.config.labels:
-            return details.config.labels.get("org.opencontainers.image.version", "0")
-        return "0"
-
-    async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
-        """Install an update."""
-        update: Update = await self._komodo.api.execute.deployStack(DeployStack(stack= self._stack, services= [self._service]))
-        update = await wait_for_completion(self._komodo.api, update, f"Update of {self._stack}/{self._service}")
-        await self.coordinator.async_refresh()
-        
-    async def async_release_notes(self) -> str | None:
-        """Return the release notes."""
-        return "Release notes"
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_latest_version = self._find_latest_version()
-        self._attr_installed_version = self._find_installed_version()
-        self.async_write_ha_state()
+    entities = create_update_entities_for_services(komodo.coordinator, entry.entry_id)
+    async_add_entities(entities)

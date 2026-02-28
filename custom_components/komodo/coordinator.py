@@ -26,8 +26,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .data.komodo_data import KomodoData
-from .data.stack import (KomodoUpdateInfo, KomodoStack)
-from .data.service import KomodoService
+from .data.stack import  KomodoStack
+from .data.service import KomodoService, KomodoUpdateInfo
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,5 +123,5 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 else:
                     _LOGGER.debug("Inspecting service %s in stack %s for update", service.service, stack_id)
                     response = await self.my_api.read.inspectStackContainer(InspectStackContainer(stack=stack_id, service=service.service))
-                    infos.append(KomodoService(service, KomodoUpdateInfo(response)))
+                    infos.append(KomodoService(service, KomodoUpdateInfo(response, now)))
         return infos

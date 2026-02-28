@@ -1,5 +1,4 @@
 from komodo_api.types import (
-    InspectStackContainerResponse,
     ResourceListItem,
     StackListItem,
     StackState,
@@ -7,13 +6,6 @@ from komodo_api.types import (
 from typing import List
 
 from .service import KomodoService
-
-
-class KomodoUpdateInfo:
-    """Update information for a service."""
-
-    def __init__(self, info: InspectStackContainerResponse):
-        self.info = info
 
 
 class KomodoStack:
