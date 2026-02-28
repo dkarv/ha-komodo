@@ -10,6 +10,10 @@ from custom_components.komodo.base import KomodoBase
 from custom_components.komodo.const import DOMAIN
 from custom_components.komodo.utils import wait_for_completion
 
+import logging
+
+_LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
@@ -38,5 +42,7 @@ class KomodoProcedureButton(ButtonEntity):
         self._attr_name = f"Procedure {procedure.name}"
 
     async def async_press(self) -> None:
+        _LOGGER.info("Starting procedure %s", self._procedure.name)
         update = await self._api.execute.runProcedure(RunProcedure(procedure = self._procedure.id))
         update = await wait_for_completion(self._api, update, f"Procedure {self._procedure.name}")
+        _LOGGER.info("Completed procedure %s", self._procedure.name)

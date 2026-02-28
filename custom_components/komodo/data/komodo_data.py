@@ -1,46 +1,27 @@
 
 # Arrange servers into a mapping where the key is the name property
-from typing import Mapping, Optional
+from typing import Mapping, Optional, List
 
 from .server import KomodoServer
-from .stack import KomodoStack, KomodoUpdateInfo
+from .stack import KomodoStack
+from .service import KomodoService
 from komodo_api.types import (
     ListServersResponse,
     ListStacksResponse,
     ListAlertsResponse,
-    ListServers,
-    ListStacks,
-    ListAlerts,
     ServerListItem,
     StackListItem,
     ResourceTargetServer,
     ResourceTargetStack,
-    InspectStackContainerResponse,
+    ListStackServicesResponse,
 )
-
-
-def arrange_servers_by_name(
-    servers: ListServersResponse | None,
-) -> Mapping[str, ServerListItem]:
-    if servers is None:
-        return {}
-    return {server.name: server for server in servers if hasattr(server, "name")}
-
-
-# Arrange stacks into a mapping where the key is the name property
-def arrange_stacks_by_name(
-    stacks: ListStacksResponse | None,
-) -> Mapping[str, StackListItem]:
-    if stacks is None:
-        return {}
-    return {stack.name: stack for stack in stacks if hasattr(stack, "name")}
-
 
 class KomodoData:
     """Wrapper to represent all data fetched from the API."""
     servers: Mapping[str, KomodoServer] = {}
     stacks: Mapping[str, KomodoStack] = {}
     alert_count: Optional[int] = None
+    alert_list: Optional[List[str]] = None
 
     def add_servers(self, servers: ListServersResponse):
         """Add servers from response."""
@@ -55,13 +36,12 @@ class KomodoData:
             self.servers[server_id] = server
         return server
 
-    def add_stacks(self, stacks: ListStacksResponse, services: Mapping[str, Mapping[str, KomodoUpdateInfo]]):
+    def add_stacks(self, stacks: ListStacksResponse):
         """Add stacks from response.
         services: Mapping of (stack_id, service_name) to service details.
         """
         for _stack in stacks:
-            stack = KomodoStack(_stack, services[_stack.id])
-            self.stacks[_stack.id] = stack
+            self.stacks[_stack.id] = KomodoStack(_stack)
     
     def get_stack(self, stack_id: str) -> KomodoStack:
         """Get stack by ID."""
@@ -74,10 +54,18 @@ class KomodoData:
     def add_alerts(self, alerts: ListAlertsResponse):
         """Add alerts from response."""
         self.alert_count = len(alerts.alerts) + (0 if alerts.next_page is None else 99)
-        # TODO currently only server and stack alerts are processed
+        self.alert_list = [alert.data.type for alert in alerts.alerts]
         for alert in alerts.alerts:
             if isinstance(alert.target, ResourceTargetServer):
                 self.get_server(alert.target.id).add_alert(alert)
             elif isinstance(alert.target, ResourceTargetStack):
                 self.get_stack(alert.target.id).add_alert(alert)
-            
+
+    def add_services(self, stack_id: str, 
+                     services: List[KomodoService],
+                     ):
+        """Add services for a stack from response."""
+        stack = self.get_stack(stack_id)
+
+        for service in services:
+            stack.add_service(service)

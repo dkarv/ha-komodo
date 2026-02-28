@@ -23,7 +23,7 @@ class KomodoEntity(CoordinatorEntity[KomodoCoordinator], Entity):
         coordinator,
         extractor,
         key: str,
-        device_info: DeviceInfo,
+        device_info: DeviceInfo | None,
     ) -> None:
         """Initialize the common functionality."""
         super().__init__(coordinator)
@@ -42,7 +42,7 @@ class KomodoSensor(KomodoEntity, SensorEntity):
         coordinator,
         extractor,
         key: str,
-        device_info: DeviceInfo,
+        device_info: DeviceInfo | None = None,
     ) -> None:
         """Initialize the sensor with the common coordinator."""
         KomodoEntity.__init__(self, item_id=item_id, coordinator=coordinator, extractor=extractor, key=key, device_info=device_info )

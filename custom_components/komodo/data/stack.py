@@ -1,40 +1,55 @@
-from typing import Mapping
 from komodo_api.types import (
+    InspectStackContainerResponse,
+    ResourceListItem,
     StackListItem,
-	StackState,
-	InspectStackContainerResponse,
-	ResourceListItem,
+    StackState,
 )
+from typing import List
+
+from .service import KomodoService
 
 
 class KomodoUpdateInfo:
-	"""Update information for a service."""
-	# TODO
+    """Update information for a service."""
 
-	def __init__(self, info: InspectStackContainerResponse):
-		pass
+    def __init__(self, info: InspectStackContainerResponse):
+        self.info = info
+
 
 class KomodoStack:
-	"""Wrapper for a stack list item returned from the API."""
-	state: StackState | None
-	id: str
-	name: str
-	server_id: str
-	update_info: Mapping[str, KomodoUpdateInfo] = {}
+    """Wrapper for a stack list item returned from the API."""
 
-	def __init__(self, item: ResourceListItem[StackListItem], services: Mapping[str, KomodoUpdateInfo]):
-		self.state = item.info.state
-		self.id = item.id
-		self.name = item.name
-		self.server_id = item.info.server_id
-		self.update_info = services
+    state: StackState | None
+    id: str
+    name: str
+    server_id: str
+    services: dict[str, KomodoService]
+    alerts: List[str]
 
-	@classmethod
-	def unknown(cls) -> "KomodoStack":
-		"""Create unknown stack."""
-		self = cls.__new__(cls)
-		self.state = None
-		self.id = "unknown"
-		self.name = "unknown"
-		self.server_id = "unknown"
-		return self
+    def __init__(self, item: ResourceListItem[StackListItem]):
+        self.state = item.info.state
+        self.id = item.id
+        self.name = item.name
+        self.server_id = item.info.server_id
+        self.services = {}
+        self.alerts = []
+
+    def add_service(self, service: "KomodoService") -> None:
+        """Store a service for this stack."""
+        self.services[service.name] = service
+
+    def add_alert(self, alert) -> None:
+        """Add an alert to this stack."""
+        self.alerts.append(alert.id)
+
+    @classmethod
+    def unknown(cls) -> "KomodoStack":
+        """Create unknown stack."""
+        self = cls.__new__(cls)
+        self.state = None
+        self.id = "unknown"
+        self.name = "unknown"
+        self.server_id = "unknown"
+        self.services = {}
+        self.alerts = []
+        return self

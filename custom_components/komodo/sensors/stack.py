@@ -27,6 +27,12 @@ def create_stack_sensors(
             stk = data.get_stack(sid)
             return stk.state.name
 
+        def joiner(data, sid=stack.id):
+            stk = data.get_stack(sid)
+            if stk.alerts:
+                return ", ".join(stk.alerts)
+            return ""
+
         sensors.append(
             KomodoOptionSensor(
                 coordinator=coordinator,
@@ -36,6 +42,15 @@ def create_stack_sensors(
                 device_info=device_info,
                 options=[state.name for state in StackState],
             )
+        )
+        sensors.append(
+            KomodoSensor(
+                coordinator=coordinator,
+                item_id=item_id,
+                extractor=joiner,
+                key="alert_list",
+                device_info=device_info,
+            ) 
         )
 
     return sensors

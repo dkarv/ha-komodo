@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from datetime import timedelta
-from typing import Mapping
+from typing import List
 
 from komodo_api.types import InspectStackContainer, InspectStackContainerResponse
 
@@ -16,15 +16,18 @@ from komodo_api.types import (
     ListServers,
     ListStacks,
     ListAlerts,
+    ListStackServices,
     ServerListItem,
     StackListItem,
+    StackService,
 )
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .data.komodo_data import KomodoData
-from .data.stack import KomodoUpdateInfo
+from .data.stack import (KomodoUpdateInfo, KomodoStack)
+from .data.service import KomodoService
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,8 +80,7 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             if isinstance(responses[1], Exception):
                 _LOGGER.error("Error fetching stacks", exc_info=responses[1])
             else:
-                services = await self._query_services(responses[1])
-                data.add_stacks(responses[1], services)
+                data.add_stacks(responses[1])
 
             # Alerts
             if isinstance(responses[2], Exception):
@@ -87,42 +89,39 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 # TODO we currently only fetch the first page of alerts
                 data.add_alerts(responses[2])
 
+        # Fetch details for services
+        await self._list_services(data)
         return data
-
-    async def _query_services(
-        self, stacks: ListStacksResponse
-    ) -> Mapping[str, Mapping[str, InspectStackContainerResponse]]:
-        """Query details for all services that have updates available."""
-
-        now = time.time()
-        services_mapping = {}
-        detail_tasks = {}
-
-        # Check which services need to be queried
-        for stack in stacks:
-            services_mapping[stack.id] = {}
-            for service in stack.info.services:
-                if not service.update_available:
-                    continue
-                # Check if we have previous data and it's not older than 2 hours (7200 seconds)
-                prev_data = None
-                prev_time = None
-                if self.data and self.data.services:
-                    prev_data = self.data.services.get(stack.id, {}).get(service.service)
-                    prev_time = self._service_timestamps.get((stack.id, service.service))
-                if prev_data and prev_time and (now - prev_time) < 7200:
-                    services_mapping[stack.id][service.service] = prev_data
+    
+    async def _list_services(self, data: KomodoData):
+        """Fetch services for each stack."""
+        tasks = {}
+        for stack_id in data.stacks.keys():
+            tasks[stack_id] = self.my_api.read.listStackServices(ListStackServices(stack=stack_id))
+        
+        if tasks:
+            responses = await asyncio.gather(*tasks.values(), return_exceptions=True)
+            for stack_id, response in zip(tasks.keys(), responses):
+                if isinstance(response, Exception):
+                    _LOGGER.error("Error fetching services for stack %s", stack_id, exc_info=response)
                 else:
-                    _LOGGER.info("Fetching details for %s - %s", stack.id, service.service)
-                    detail_tasks[(stack.id, service.service)] = self.my_api.read.inspectStackContainer(
-                        InspectStackContainer(stack=stack.id, service=service.service)
-                    )
-
-        # Gather only the needed tasks
-        if detail_tasks:
-            service_results = await asyncio.gather(*detail_tasks.values())
-            for (stack_id, service_name), result in zip(detail_tasks.keys(), service_results):
-                services_mapping[stack_id][service_name] = KomodoUpdateInfo(result)
-                self._service_timestamps[(stack_id, service_name)] = now
-
-        return services_mapping
+                    previous_stack = self.data.stacks[stack_id] if self.data else None
+                    services = await self._inspect_services_if_needed(response, stack_id, previous_stack)
+                    data.add_services(stack_id, services)
+    
+    async def _inspect_services_if_needed(self, services: List[StackService], stack_id: str, previous_stack: KomodoStack | None) -> list[KomodoService]:
+        infos = []
+        now = time.time()
+        for service in services:
+            if not service.update_available:
+                infos.append(KomodoService(service))
+            else:
+                previous_service = previous_stack.services.get(service.service) if previous_stack else None
+                previous_update_info = previous_service.update_info if previous_service else None
+                if previous_update_info and (now - previous_update_info.info.info_updated_at) < 7200:
+                    infos.append(KomodoService(service, previous_update_info))
+                else:
+                    _LOGGER.debug("Inspecting service %s in stack %s for update", service.service, stack_id)
+                    response = await self.my_api.read.inspectStackContainer(InspectStackContainer(stack=stack_id, service=service.service))
+                    infos.append(KomodoService(service, KomodoUpdateInfo(response)))
+        return infos

@@ -21,6 +21,18 @@
         "binary_sensor": {
         },
         "sensor": {
+            "server_state": {
+                "name": "Server State"
+            },
+            "stack_state": {
+                "name": "Stack State"            
+            },
+            "alert_count": {
+                "name": "Alert Count"
+            },
+            "alert_list": {
+                "name": "Alerts"
+            }
         }
     }
 }

@@ -26,8 +26,8 @@ async def async_setup_entry(
     await komodo.first_refresh()
 
     entities = (
-        create_server_sensors(komodo.coordinator, entry.entry_id) + 
-        create_stack_sensors(komodo.coordinator, entry.entry_id) + 
+        create_server_sensors(komodo.coordinator, entry.entry_id) +
+        create_stack_sensors(komodo.coordinator, entry.entry_id) +
         create_alert_sensors(komodo.coordinator, entry.entry_id)
     )
 

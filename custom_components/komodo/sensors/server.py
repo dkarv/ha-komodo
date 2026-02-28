@@ -24,6 +24,12 @@ def create_server_sensors(
             srv = data.get_server(sid)
             return srv.state.name
 
+        def joiner(data, sid=server.id):
+            srv = data.get_server(sid)
+            if srv.alerts:
+                return ", ".join(srv.alerts)
+            return ""
+
         sensors.append(
             KomodoOptionSensor(
                 coordinator=coordinator,
@@ -33,6 +39,15 @@ def create_server_sensors(
                 device_info=device_info,
                 options=[state.name for state in ServerState],
             )
+        )
+        sensors.append(
+            KomodoSensor(
+                coordinator=coordinator,
+                item_id=item_id,
+                extractor=joiner,
+                key="alert_list",
+                device_info=device_info,
+            ) 
         )
 
     return sensors
