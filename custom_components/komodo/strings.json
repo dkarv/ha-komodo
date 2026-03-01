@@ -22,11 +22,28 @@
     "sensor": {
       "test": {
         "name": "Test"
+      },
+      "server_state": {
+        "name": "Server State"
+      },
+      "stack_state": {
+        "name": "Stack State"
+      },
+      "alert_count": {
+        "name": "Alert Count"
+      },
+      "alert_list": {
+        "name": "Alerts"
       }
     },
     "binary_sensor": {
       "test": {
         "name": "Test"
+      }
+    },
+    "switch": {
+      "service": {
+        "name": "Service Status"
       }
     }
   }

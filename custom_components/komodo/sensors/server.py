@@ -1,22 +1,53 @@
+from komodo_api.types import ServerState
 from ..coordinator import KomodoCoordinator
 from .common import KomodoSensor, KomodoOptionSensor
-from komodo_api.types import ServerState
+from homeassistant.helpers.device_registry import DeviceInfo
+from ..const import DOMAIN
+
 
 def create_server_sensors(
-    coordinator: KomodoCoordinator, 
-    id: str,
+    coordinator: KomodoCoordinator,
+    entry_id: str,
 ) -> list[KomodoSensor]:
-    """
-    Returns a list of sensors.
-    """
-    return [
-        KomodoOptionSensor(
-            coordinator=coordinator,
-            id = id,
-            extractor= lambda item: item.servers[server.name].info.state.name,
-            category = "server",
-            key = "state",
-            name = server.name,
-            options = [state.name for state in ServerState],
-        ) for server in coordinator.data.servers.values()
-    ]
+    """Return a list of sensors, one device per server."""
+    sensors: list[KomodoSensor] = []
+    for server in coordinator.data.servers.values():
+        device_info = DeviceInfo(
+            identifiers={(DOMAIN, server.id)},
+            name=server.name,
+            manufacturer="Komodo",
+        )
+
+        item_id = f"{entry_id}_{server.id}"
+
+        def extractor(data, sid=server.id):
+            srv = data.get_server(sid)
+            return srv.state.name
+
+        def joiner(data, sid=server.id):
+            srv = data.get_server(sid)
+            if srv.alerts:
+                return ", ".join(srv.alerts)
+            return ""
+
+        sensors.append(
+            KomodoOptionSensor(
+                coordinator=coordinator,
+                item_id=item_id,
+                extractor=extractor,
+                key="server_state",
+                device_info=device_info,
+                options=[state.name for state in ServerState],
+            )
+        )
+        sensors.append(
+            KomodoSensor(
+                coordinator=coordinator,
+                item_id=item_id,
+                extractor=joiner,
+                key="alert_list",
+                device_info=device_info,
+            )
+        )
+
+    return sensors
