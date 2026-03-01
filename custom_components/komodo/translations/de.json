@@ -32,6 +32,11 @@
             "alert_list": {
                 "name": "Alarme"
             }
+        },
+        "switch": {
+            "service": {
+                "name": "Dienst Status"
+            }
         }
     }
 }

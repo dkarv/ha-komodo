@@ -40,6 +40,11 @@
       "test": {
         "name": "Test"
       }
+    },
+    "switch": {
+      "service": {
+        "name": "Service Status"
+      }
     }
   }
 }

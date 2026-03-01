@@ -94,7 +94,7 @@ def create_update_entities_for_services(
 
     for stack in coordinator.data.stacks.values():
         device_info = create_stack_device_info(
-            stack.id, stack.name, stack.server_id, DOMAIN
+            stack.id, stack.name, stack.server_id
         )
 
         for service in stack.services.values():
