@@ -24,7 +24,7 @@ class KomodoServer:
         self.alerts = []
         self.stack_count = 0
         self.service_count = 0
-        self.periphery_version = item.version
+        self.periphery_version = item.info.version
 
     def add_alert(self, alert) -> None:
         """Add an alert to this server."""
