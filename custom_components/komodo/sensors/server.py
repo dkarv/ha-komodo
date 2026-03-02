@@ -16,6 +16,7 @@ def create_server_sensors(
             identifiers={(DOMAIN, server.id)},
             name=server.name,
             manufacturer="Komodo",
+            sw_version=server.periphery_version,
         )
 
         item_id = f"{entry_id}_{server.id}"
@@ -46,6 +47,32 @@ def create_server_sensors(
                 item_id=item_id,
                 extractor=joiner,
                 key="alert_list",
+                device_info=device_info,
+            )
+        )
+
+        def stack_counter(data, sid=server.id):
+            return data.servers[sid].stack_count
+
+        sensors.append(
+            KomodoSensor(
+                coordinator=coordinator,
+                item_id=item_id,
+                extractor=stack_counter,
+                key="stack_count",
+                device_info=device_info,
+            )
+        )
+
+        def service_counter(data, sid=server.id):
+            return data.servers[sid].service_count
+
+        sensors.append(
+            KomodoSensor(
+                coordinator=coordinator,
+                item_id=item_id,
+                extractor=service_counter,
+                key="service_count",
                 device_info=device_info,
             )
         )

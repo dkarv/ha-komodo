@@ -43,6 +43,9 @@ class KomodoData:
         """
         for _stack in stacks:
             self.stacks[_stack.id] = KomodoStack(_stack)
+            # Update server stack count
+            server = self.get_server(_stack.info.server_id)
+            server.add_stack()
 
     def get_stack(self, stack_id: str) -> KomodoStack:
         """Get stack by ID."""
@@ -72,3 +75,7 @@ class KomodoData:
 
         for service in services:
             stack.add_service(service)
+        
+        # Update server service count
+        server = self.get_server(stack.server_id)
+        server.add_services(len(services))

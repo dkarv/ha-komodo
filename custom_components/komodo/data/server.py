@@ -13,16 +13,30 @@ class KomodoServer:
     id: str
     name: str
     alerts: List[str]
+    stack_count: int
+    service_count: int
+    periphery_version: str | None
 
     def __init__(self, item: ResourceListItem[ServerListItem]):
         self.state = item.info.state
         self.id = item.id
         self.name = item.name
         self.alerts = []
+        self.stack_count = 0
+        self.service_count = 0
+        self.periphery_version = item.version
 
     def add_alert(self, alert) -> None:
         """Add an alert to this server."""
         self.alerts.append(alert.id)
+
+    def add_stack(self) -> None:
+        """Increment stack count for this server."""
+        self.stack_count += 1
+
+    def add_services(self, count: int) -> None:
+        """Add services to this server."""
+        self.service_count += count
 
     @classmethod
     def unknown(cls) -> "KomodoServer":
@@ -30,4 +44,6 @@ class KomodoServer:
         self = cls.__new__(cls)
         self.state = None
         self.alerts = []
+        self.stack_count = 0
+        self.service_count = 0
         return self
