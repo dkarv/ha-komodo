@@ -10,10 +10,7 @@ from komodo_api.types import (
     ResourceListItem,
     ProcedureListItemInfo,
     RunProcedure,
-<<<<<<< HEAD
     DeployStack,
-=======
->>>>>>> d38fbb5 (Better entity structure (#24))
 )
 from komodo_api.lib import KomodoClient
 
@@ -28,12 +25,6 @@ _LOGGER = logging.getLogger(__name__)
 
 import logging
 
-<<<<<<< HEAD
-=======
-_LOGGER = logging.getLogger(__name__)
-
-
->>>>>>> d38fbb5 (Better entity structure (#24))
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
@@ -44,7 +35,6 @@ async def async_setup_entry(
         procedures: ListProceduresResponse = await komodo.api.read.listProcedures(
             ListProcedures()
         )
-<<<<<<< HEAD
         procedure_entities = [
             KomodoProcedureButton(komodo.api, entry.entry_id, procedure)
             for procedure in procedures
@@ -61,10 +51,6 @@ async def async_setup_entry(
     )
 
     async_add_entities(procedure_entities + deploy_entities)
-=======
-    except Exception:
-        return
->>>>>>> d38fbb5 (Better entity structure (#24))
 
 
 
@@ -91,7 +77,6 @@ class KomodoProcedureButton(ButtonEntity):
             self._api, update, f"Procedure {self._procedure.name}"
         )
         _LOGGER.info("Completed procedure %s", self._procedure.name)
-<<<<<<< HEAD
 
 
 class KomodoStackDeployButton(CoordinatorEntity[KomodoCoordinator], ButtonEntity):
@@ -160,5 +145,3 @@ def create_deploy_buttons_for_stacks(
         entities.append(entity)
 
     return entities
-=======
->>>>>>> d38fbb5 (Better entity structure (#24))
