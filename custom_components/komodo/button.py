@@ -54,7 +54,6 @@ async def async_setup_entry(
 
 
 
-
 class KomodoProcedureButton(ButtonEntity):
     def __init__(
         self,
