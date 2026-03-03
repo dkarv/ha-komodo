@@ -60,9 +60,11 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
         if service and service.update_info:
             self._attr_installed_version = service.update_info.current_version
             self._attr_latest_version = service.update_info.new_version
+            self._attr_title = f"{self._service_name}: "
         else:
             self._attr_installed_version = "0"
             self._attr_latest_version = "0"
+            self._attr_title = None
 
     async def async_install(
         self, version: str | None, backup: bool, **kwargs: Any
