@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET
 from .base import KomodoBase
@@ -45,3 +46,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await komodo.close()
 
     return unload_ok
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, config_entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow removing a device (stack) from the UI."""
+    entity_reg = er.async_get(hass)
+    entities = er.async_entries_for_device(
+        entity_reg,
+        device_entry.id,
+        include_disabled_entities=True,
+    )
+    return not any(
+        entity.config_entry_id == config_entry.entry_id for entity in entities
+    )
