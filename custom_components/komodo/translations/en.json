@@ -31,6 +31,12 @@
             },
             "alert_list": {
                 "name": "Alerts"
+            },
+            "stack_count": {
+                "name": "Stack Count"
+            },
+            "service_count": {
+                "name": "Service Count"
             }
         },
         "switch": {
