@@ -30,7 +30,7 @@ This gives you full visibility and basic control over your Komodo-managed infras
 
 The easiest way to install the Komodo integration is via HACS.
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=SpaceFrags&repository=komodo&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dkarv&repository=ha-komodo&category=integration)
 
 ### 2. Installation via HACS Manually
 
@@ -39,7 +39,7 @@ HACS (Home Assistant Community Store) makes installation and updates simple. Sin
 1. In Home Assistant, go to **HACS**.
 2. Go to the **Integrations** tab.
 3. Click the three dots **(⋮)** in the top right corner and select **Custom repositories**.
-4. Enter the URL: `https://github.com/SpaceFrags/komodo`
+4. Enter the URL: `https://github.com/dkarv/ha-komodo`
 5. Select **Integration** as the Category.
 6. Click **ADD**.
 7. After the repository is added, search for **"Komodo"** in the HACS Integrations section and click **Download**.
@@ -47,9 +47,9 @@ HACS (Home Assistant Community Store) makes installation and updates simple. Sin
 
 ### 3. Manual Installation
 
-1. Download the latest release zip file from the [GitHub releases page](https://github.com/SpaceFrags/komodo/releases).
-2. Extract the contents. You should find a folder named `komodo`.
-3. Copy the entire `komodo` folder into your Home Assistant configuration directory under `custom_components/`.
+1. Download the latest release zip file from the [GitHub releases page](https://github.com/dkarv/ha-komodo/releases).
+2. Extract the contents. You should find a folder named `ha-komodo`.
+3. Copy the entire `ha-komodo` folder into your Home Assistant configuration directory under `custom_components/`.
    - **Resulting Path:** `config/custom_components/komodo/`
 4. **Restart Home Assistant** to load the new integration.
 
