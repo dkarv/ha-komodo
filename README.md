@@ -1,4 +1,4 @@
-# Komodo
+# HA-Komodo
 
 ## 🦎 Monitor Your Komodo Infrastructure in Home Assistant
 
@@ -12,7 +12,7 @@ Komodo is a registered trademark of its respective owners. This project uses the
 
 ***
 
-The **Komodo** integration connects Home Assistant directly to your Komodo instance, pulling live information about your servers and stacks and organizing them into dedicated devices.
+The **HA-Komodo** integration connects Home Assistant directly to your Komodo instance, pulling live information about your servers and stacks and organizing them into dedicated devices.
 
 For each **server** connected to your Komodo instance, a device is created containing key sensors such as stack count, service count, server status, and alert count. For each **stack**, a dedicated device is created that exposes:
 
