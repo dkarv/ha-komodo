@@ -2,16 +2,6 @@
 
 ## 🦎 Monitor Your Komodo Infrastructure in Home Assistant
 
-***
-
-## Disclaimer
-
-This integration is an **independent, community-maintained project** and is **not affiliated with, endorsed by, or officially associated with the Komodo project** or its developers.
-
-Komodo is a registered trademark of its respective owners. This project uses the name "Komodo" solely for the purpose of identifying the software it integrates with.
-
-***
-
 The **HA-Komodo** integration connects Home Assistant directly to your Komodo instance, pulling live information about your servers and stacks and organizing them into dedicated devices.
 
 For each **server** connected to your Komodo instance, a device is created containing key sensors such as stack count, service count, server status, and alert count. For each **stack**, a dedicated device is created that exposes:
@@ -94,3 +84,12 @@ Each stack gets its own device with entities for every service it contains:
 | Stack Status | Sensor | The current state of the stack (e.g., `Running`, `Down`) |
 | `<Service Name>` | Switch | Reflects the running state of the service; toggle to start or stop it |
 | `<Service Name>` Update | Update | Tracks available image updates and allows triggering them |
+
+
+## Disclaimer
+
+This integration is an **independent, community-maintained project** and is **not affiliated with, endorsed by, or officially associated with the Komodo project** or its developers.
+
+## Contributing
+
+In case you have any suggestion or problem, feel free to open an Issue. I'm open to any pull requests with fixes or new features. For bigger changes please approach me beforehand to coordinate.
