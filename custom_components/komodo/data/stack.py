@@ -32,7 +32,7 @@ class KomodoStack:
 
     def add_alert(self, alert) -> None:
         """Add an alert to this stack."""
-        self.alerts.append(alert.id)
+        self.alerts.append(alert.data.type)
 
     @classmethod
     def unknown(cls) -> "KomodoStack":
