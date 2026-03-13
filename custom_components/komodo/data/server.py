@@ -28,7 +28,7 @@ class KomodoServer:
 
     def add_alert(self, alert) -> None:
         """Add an alert to this server."""
-        self.alerts.append(alert.id)
+        self.alerts.append(alert.data.type)
 
     def add_stack(self) -> None:
         """Increment stack count for this server."""
