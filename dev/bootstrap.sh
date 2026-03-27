@@ -2,12 +2,13 @@
 
 set -e
 
-# TODO find way to install dependencies from manifest.json directly
 # Create a local venv in the workspace and install requirements
-PYTHON="/usr/local/bin/python3.13"
+PYTHON=$(which python)
 if [ ! -d "dev/.venv" ]; then
+  echo "Create virtual environment in dev/.venv"
   $PYTHON -m venv dev/.venv
 fi
 . dev/.venv/bin/activate
+
 pip install --upgrade pip setuptools wheel
-pip install -r requirements.txt
+jq -r .requirements.[] custom_components/*/manifest.json | xargs pip install

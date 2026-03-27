@@ -1,4 +1,4 @@
-FROM homeassistant/home-assistant:beta
+FROM homeassistant/home-assistant:stable
 
 RUN apk add inotify-tools
 
