@@ -1,5 +1,5 @@
 from komodo_api.types import (
-    StackService,
+    StackServiceWithUpdate,
     InspectStackContainerResponse,
     ContainerStateStatusEnum,
 )
@@ -31,10 +31,10 @@ class KomodoService:
     state: ContainerStateStatusEnum | None
     update_info: KomodoUpdateInfo | None
 
-    def __init__(self, item: StackService, update_info: KomodoUpdateInfo | None = None):
+    def __init__(self, item: StackServiceWithUpdate, update_info: KomodoUpdateInfo | None = None):
         self.name = item.service
         self.update_available = item.update_available
-        self.state = item.container.state if item.container else None
+        self.state = None
         if item.update_available:
             self.update_info = update_info
         else:

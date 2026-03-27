@@ -68,11 +68,11 @@ class KomodoServiceSwitch(CoordinatorEntity[KomodoCoordinator], SwitchEntity):
     def _update_attrs(self) -> None:
         """Update entity attributes from coordinator data."""
         service = self._find_service()
-        if service and service.state:
+        if service and service.state is not None:
             # Service is "on" when state is RUNNING
-            self._attr_is_on = service.state == ContainerStateStatusEnum.RUNNING
+            self._attr_is_on = service.state.running
         else:
-            self._attr_is_on = False
+            self._attr_is_on = None
     
     async def query_container(self) -> str:
         """Query the container name."""

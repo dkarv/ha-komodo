@@ -42,10 +42,16 @@ class KomodoData:
         services: Mapping of (stack_id, service_name) to service details.
         """
         for _stack in stacks:
-            self.stacks[_stack.id] = KomodoStack(_stack)
+            stack = KomodoStack(_stack)
+            self.stacks[_stack.id] = stack
+
             # Update server stack count
             server = self.get_server(_stack.info.server_id)
             server.add_stack()
+            server.add_services(len(_stack.info.services))
+
+            for service in _stack.info.services:
+                stack.add_service(KomodoService(service))
 
     def get_stack(self, stack_id: str) -> KomodoStack:
         """Get stack by ID."""
@@ -64,18 +70,3 @@ class KomodoData:
                 self.get_server(alert.target.id).add_alert(alert)
             elif isinstance(alert.target, ResourceTargetStack):
                 self.get_stack(alert.target.id).add_alert(alert)
-
-    def add_services(
-        self,
-        stack_id: str,
-        services: List[KomodoService],
-    ):
-        """Add services for a stack from response."""
-        stack = self.get_stack(stack_id)
-
-        for service in services:
-            stack.add_service(service)
-        
-        # Update server service count
-        server = self.get_server(stack.server_id)
-        server.add_services(len(services))
