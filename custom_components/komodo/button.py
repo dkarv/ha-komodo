@@ -41,9 +41,6 @@ async def async_setup_entry(
         ]
     except Exception:
         procedure_entities = []
-
-    # Wait for first refresh to get stack data
-    await komodo.first_refresh()
     
     # Stack deploy buttons
     deploy_entities = create_deploy_buttons_for_stacks(

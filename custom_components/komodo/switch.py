@@ -156,7 +156,5 @@ async def async_setup_entry(
     """Setup switch platform."""
     komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
 
-    await komodo.first_refresh()
-
     entities = create_switch_entities_for_services(komodo.api, komodo.coordinator, entry.entry_id)
     async_add_entities(entities)

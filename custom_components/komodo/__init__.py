@@ -2,6 +2,7 @@
 
 import logging
 
+from custom_components.komodo import coordinator
 from komodo_api.lib import ApiKeyInitOptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -33,6 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady from e
 
     hass.data[DOMAIN][entry.entry_id] = komodo
+    await komodo.coordinator.async_config_entry_first_refresh()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

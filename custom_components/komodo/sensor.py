@@ -23,8 +23,6 @@ async def async_setup_entry(
     """Set up Komodo sensors from config entry."""
     komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
 
-    await komodo.first_refresh()
-
     entities = (
         create_server_sensors(komodo.coordinator, entry.entry_id)
         + create_stack_sensors(komodo.coordinator, entry.entry_id)

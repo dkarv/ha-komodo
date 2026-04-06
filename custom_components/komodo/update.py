@@ -119,7 +119,5 @@ async def async_setup_entry(
     """Setup update platform."""
     komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
 
-    await komodo.first_refresh()
-
     entities = create_update_entities_for_services(komodo.coordinator, entry.entry_id)
     async_add_entities(entities)

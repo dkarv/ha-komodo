@@ -5,6 +5,7 @@ from .coordinator import KomodoCoordinator
 
 
 class KomodoBase:
+    """Base class for Komodo integration, holding shared API client and coordinator."""
     api: KomodoClient
     coordinator: KomodoCoordinator
 
@@ -25,7 +26,3 @@ class KomodoBase:
             await self.api.read.getVersion(GetVersion())
         except Exception as e:
             raise ConnectionError(f"Failed to connect to Komodo API: {e}") from e
-
-    async def first_refresh(self) -> None:
-        if self.coordinator.data is None:
-            await self.coordinator.async_config_entry_first_refresh()
