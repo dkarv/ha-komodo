@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -16,15 +17,13 @@ def mock_procedure():
         name = "Test Procedure"
     return Procedure()
 
-@pytest.mark.asyncio
-async def test_button_entity_creation(mock_komodo_api, mock_procedure):
+def test_button_entity_creation(mock_komodo_api, mock_procedure):
     entity = button.KomodoProcedureButton(mock_komodo_api, "entry_id", mock_procedure)
     assert entity.entity_id == "button.komodo_button_test_id"
     assert entity._attr_unique_id == "entry_id_button_test_id"
     assert entity._attr_name == "Procedure Test Procedure"
 
-@pytest.mark.asyncio
-async def test_async_press_calls_runProcedure(monkeypatch, mock_komodo_api, mock_procedure):
+def test_async_press_calls_runProcedure(monkeypatch, mock_komodo_api, mock_procedure):
     entity = button.KomodoProcedureButton(mock_komodo_api, "entry_id", mock_procedure)
     mock_update = MagicMock()
     mock_komodo_api.execute.runProcedure.return_value = mock_update
@@ -38,7 +37,7 @@ async def test_async_press_calls_runProcedure(monkeypatch, mock_komodo_api, mock
         return "done"
     monkeypatch.setattr(button, "wait_for_completion", fake_wait_for_completion)
 
-    result = await entity.async_press()
+    asyncio.run(entity.async_press())
     mock_komodo_api.execute.runProcedure.assert_awaited_once_with(
         button.RunProcedure(procedure=mock_procedure.id)
     )
