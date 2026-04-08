@@ -83,6 +83,7 @@ Each stack gets its own device with entities for every service it contains:
 | Entity | Type | Description |
 |---|---|---|
 | Stack Status | Sensor | The current state of the stack (e.g., `Running`, `Down`) |
+| Deploy `<Stack Name>` stack | Button | Deploys the stack |
 | `<Service Name>` | Switch | Reflects the running state of the service; toggle to start or stop it |
 | `<Service Name>` Update | Update | Tracks available image updates and allows triggering them |
 
