@@ -7,6 +7,7 @@ The **HA-Komodo** integration connects Home Assistant directly to your Komodo in
 For each **server** connected to your Komodo instance, a device is created containing key sensors such as stack count, service count, server status, and alert count. For each **stack**, a dedicated device is created that exposes:
 
 - A **status sensor** for the stack itself.
+- A **button entity** to deploy the stack.
 - A **switch entity per service** — reflecting the current running state and allowing you to start or stop each service directly from Home Assistant.
 - An **update entity per service** — so you can track and trigger image updates from your dashboard.
 
