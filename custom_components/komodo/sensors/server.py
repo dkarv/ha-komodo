@@ -1,8 +1,9 @@
-from komodo_api.types import ServerState
-from ..coordinator import KomodoCoordinator
-from .common import KomodoSensor, KomodoOptionSensor
 from homeassistant.helpers.device_registry import DeviceInfo
+from komodo_api.types import ServerState
+
 from ..const import DOMAIN
+from ..coordinator import KomodoCoordinator
+from .common import KomodoOptionSensor, KomodoSensor
 
 
 def create_server_sensors(
@@ -23,7 +24,10 @@ def create_server_sensors(
 
         def extractor(data, sid=server.id):
             srv = data.get_server(sid)
-            return srv.state.name
+            state = srv.state
+            if state is None:
+                return None
+            return state.name
 
         def joiner(data, sid=server.id):
             srv = data.get_server(sid)

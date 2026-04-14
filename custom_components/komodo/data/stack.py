@@ -35,12 +35,12 @@ class KomodoStack:
         self.alerts.append(alert.data.type)
 
     @classmethod
-    def unknown(cls) -> "KomodoStack":
+    def unknown(cls, stack_id: str) -> "KomodoStack":
         """Create unknown stack."""
         self = cls.__new__(cls)
         self.state = None
-        self.id = "unknown"
-        self.name = "unknown"
+        self.id = stack_id
+        self.name = f"Unknown Stack {stack_id}"
         self.server_id = "unknown"
         self.services = {}
         self.alerts = []

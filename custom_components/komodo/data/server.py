@@ -39,11 +39,14 @@ class KomodoServer:
         self.service_count += count
 
     @classmethod
-    def unknown(cls) -> "KomodoServer":
+    def unknown(cls, server_id: str) -> "KomodoServer":
         """Create unknown server."""
         self = cls.__new__(cls)
+        self.id = server_id
+        self.name = f"Unknown Server {server_id}"
         self.state = None
         self.alerts = []
         self.stack_count = 0
         self.service_count = 0
+        self.periphery_version = None
         return self
