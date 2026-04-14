@@ -1,19 +1,17 @@
 # Arrange servers into a mapping where the key is the name property
-from typing import Mapping, Optional, List
+from typing import List, Mapping, Optional
 
-from .server import KomodoServer
-from .stack import KomodoStack
-from .service import KomodoService
 from komodo_api.types import (
+    ListAlertsResponse,
     ListServersResponse,
     ListStacksResponse,
-    ListAlertsResponse,
-    ServerListItem,
-    StackListItem,
     ResourceTargetServer,
     ResourceTargetStack,
-    ListStackServicesResponse,
 )
+
+from .server import KomodoServer
+from .service import KomodoService
+from .stack import KomodoStack
 
 
 class KomodoData:
@@ -31,9 +29,9 @@ class KomodoData:
 
     def get_server(self, server_id: str) -> KomodoServer:
         """Get server by ID."""
-        server = self.servers[server_id]
+        server = self.servers.get(server_id)
         if server is None:
-            server = KomodoServer.unknown()
+            server = KomodoServer.unknown(server_id)
             self.servers[server_id] = server
         return server
 
@@ -55,9 +53,9 @@ class KomodoData:
 
     def get_stack(self, stack_id: str) -> KomodoStack:
         """Get stack by ID."""
-        stack = self.stacks[stack_id]
+        stack = self.stacks.get(stack_id)
         if stack is None:
-            stack = KomodoStack.unknown()
+            stack = KomodoStack.unknown(stack_id)
             self.stacks[stack_id] = stack
         return stack
 
