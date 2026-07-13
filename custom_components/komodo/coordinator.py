@@ -31,6 +31,11 @@ from .data.service import KomodoService, KomodoUpdateInfo
 
 _LOGGER = logging.getLogger(__name__)
 
+# Stack states where Komodo/Docker has no container to inspect at all.
+# Inspecting a service in one of these states fails with
+# "No service found matching '<name>'", which is expected, not an error.
+_NO_CONTAINER_STATES = {"DOWN", "UNKNOWN"}
+
 
 class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
     """Komodo coordinator."""
@@ -93,10 +98,17 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         await self._compute_update_info(data)
         await self._fetch_service_states(data)
         return data
-    
+
+    @staticmethod
+    def _stack_has_inspectable_container(stack: KomodoStack) -> bool:
+        """Return False for stack states with no container to inspect (e.g. DOWN)."""
+        return stack.state is not None and stack.state.name not in _NO_CONTAINER_STATES
+
     async def _compute_update_info(self, new_data: KomodoData):
         """Compute update info for services."""
         for stack_id, stack in new_data.stacks.items():
+            if not self._stack_has_inspectable_container(stack):
+                continue
             previous_stack = self.data.stacks[stack_id] if self.data else None
             for service_id, service in stack.services.items():
                 previous_service = previous_stack.services.get(service_id) if previous_stack else None
@@ -125,6 +137,8 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         """Fetch service states for all services."""
         tasks = []
         for stack_id, stack in data.stacks.items():
+            if not self._stack_has_inspectable_container(stack):
+                continue
             for service in stack.services.values():
                 if service.state is None:
                     tasks.append(self._inspect_service(service, stack_id, time.time()))
