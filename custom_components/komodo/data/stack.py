@@ -8,6 +8,12 @@ from typing import List
 from .service import KomodoService
 
 
+# Stack states with no container to inspect: DOWN (stack not deployed) and
+# UNKNOWN (server not reachable). Every other state still has a container that
+# inspects fine, including STOPPED/CREATED/DEAD/PAUSED.
+_NO_CONTAINER_STATES = frozenset({StackState.DOWN, StackState.UNKNOWN})
+
+
 class KomodoStack:
     """Wrapper for a stack list item returned from the API."""
 
@@ -25,6 +31,11 @@ class KomodoStack:
         self.server_id = item.info.server_id
         self.services = {}
         self.alerts = []
+
+    @property
+    def has_inspectable_container(self) -> bool:
+        """False when the stack has no container to inspect."""
+        return self.state is not None and self.state not in _NO_CONTAINER_STATES
 
     def add_service(self, service: "KomodoService") -> None:
         """Store a service for this stack."""

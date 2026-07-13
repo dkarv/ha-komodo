@@ -6,6 +6,7 @@ import time
 from datetime import timedelta
 from typing import List
 
+from komodo_api.exceptions import KomodoException
 from komodo_api.types import InspectStackContainer, InspectStackContainerResponse
 
 from komodo_api.lib import KomodoClient
@@ -31,10 +32,11 @@ from .data.service import KomodoService, KomodoUpdateInfo
 
 _LOGGER = logging.getLogger(__name__)
 
-# Stack states where Komodo/Docker has no container to inspect at all.
-# Inspecting a service in one of these states fails with
-# "No service found matching '<name>'", which is expected, not an error.
-_NO_CONTAINER_STATES = {"DOWN", "UNKNOWN"}
+# Substring of the error Komodo core returns when a stack has no container for
+# the service (see bin/core/src/api/read/stack.rs). The core sends it with the
+# default HTTP 500, so the message text is the only way to tell it apart from a
+# genuine internal error.
+_NO_CONTAINER_ERROR = "No service found matching"
 
 
 class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
@@ -99,30 +101,24 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         await self._fetch_service_states(data)
         return data
 
-    @staticmethod
-    def _stack_has_inspectable_container(stack: KomodoStack) -> bool:
-        """Return False for stack states with no container to inspect (e.g. DOWN)."""
-        return stack.state is not None and stack.state.name not in _NO_CONTAINER_STATES
-
     async def _compute_update_info(self, new_data: KomodoData):
         """Compute update info for services."""
         for stack_id, stack in new_data.stacks.items():
-            if not self._stack_has_inspectable_container(stack):
-                continue
             previous_stack = self.data.stacks[stack_id] if self.data else None
             for service_id, service in stack.services.items():
                 previous_service = previous_stack.services.get(service_id) if previous_stack else None
-                await self._inspect_service_if_needed(service, stack_id, previous_service)
+                await self._inspect_service_if_needed(stack, service, stack_id, previous_service)
 
     async def _inspect_service_if_needed(
         self,
+        stack: KomodoStack,
         service: KomodoService,
         stack_id: str,
         previous_service: KomodoService | None,
     ) -> None:
         if not service.update_available:
             return
-        
+
         now = time.time()
         previous_update_info = previous_service.update_info if previous_service else None
         if (
@@ -130,14 +126,19 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             and (now - previous_update_info.info.info_updated_at) < 7200
         ):
             service.update_info = previous_update_info
-        else:
+        elif stack.has_inspectable_container:
             await self._inspect_service(service, stack_id, now)
-    
+        else:
+            # No container to inspect (stack DOWN/UNKNOWN). Carry any cached
+            # update info forward so a pending update isn't lost while the
+            # stack is down and reported as installed=0/latest=0.
+            service.update_info = previous_update_info
+
     async def _fetch_service_states(self, data: KomodoData):
         """Fetch service states for all services."""
         tasks = []
         for stack_id, stack in data.stacks.items():
-            if not self._stack_has_inspectable_container(stack):
+            if not stack.has_inspectable_container:
                 continue
             for service in stack.services.values():
                 if service.state is None:
@@ -151,6 +152,21 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 InspectStackContainer(stack=stack_id, service=service.name)
             )
             _LOGGER.debug("Inspecting service %s in stack %s: %s", service.name, stack_id, response)
+        except KomodoException as e:
+            if _NO_CONTAINER_ERROR in e.error:
+                # Expected when a stack in a state we didn't guard against
+                # (e.g. UNHEALTHY, a partial deploy, or a service removed from
+                # the compose file) has no container for this service.
+                _LOGGER.debug(
+                    "No container to inspect for service %s in stack %s: %s",
+                    service.name, stack_id, e.error,
+                )
+            else:
+                _LOGGER.error(
+                    "Failed to inspect service %s in stack %s: %s",
+                    service.name, stack_id, e.error,
+                )
+            return
         except Exception as e:
             _LOGGER.error("Failed to inspect service %s in stack %s: %s", service.name, stack_id, e)
             return
