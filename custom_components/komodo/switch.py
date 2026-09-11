@@ -16,6 +16,9 @@ from komodo_api.types import (
     StopContainer,
     InspectStackContainerResponse,
     InspectStackContainer,
+    DeployStack,
+    StopStack,
+    StackState,
 )
 
 from .utils import wait_for_completion, create_stack_device_info
@@ -23,6 +26,7 @@ from .const import DOMAIN
 from .base import KomodoBase
 from .coordinator import KomodoCoordinator
 from .data.service import KomodoService
+from .data.stack import KomodoStack
 from komodo_api.lib import KomodoClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,6 +125,111 @@ class KomodoServiceSwitch(CoordinatorEntity[KomodoCoordinator], SwitchEntity):
         self.async_write_ha_state()
 
 
+class KomodoStackSwitch(CoordinatorEntity[KomodoCoordinator], SwitchEntity):
+    """Switch entity to deploy or stop a full stack at once."""
+
+    def __init__(
+        self,
+        coordinator: KomodoCoordinator,
+        api: KomodoClient,
+        item_id: str,
+        stack_id: str,
+        stack_name: str,
+        device_info,
+    ) -> None:
+        """Initialize the switch entity."""
+        super().__init__(coordinator)
+        self._api = api
+        self._stack_id = stack_id
+        self._stack_name = stack_name
+
+        self._attr_unique_id = f"{item_id}_stack_switch"
+        self._attr_device_info = device_info
+        self._attr_name = "Stack"
+        self._attr_has_entity_name = True
+        self._attr_icon = "mdi:layers"
+
+        self._update_attrs()
+
+    def _find_stack(self) -> KomodoStack | None:
+        """Find the stack in the coordinator data."""
+        return self.coordinator.data.stacks.get(self._stack_id)
+
+    def _update_attrs(self) -> None:
+        """Update entity attributes from coordinator data."""
+        stack = self._find_stack()
+        if stack and stack.state is not None:
+            self._attr_is_on = stack.state == StackState.RUNNING
+        else:
+            self._attr_is_on = None
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Deploy the stack."""
+        _LOGGER.info("Deploying stack %s", self._stack_name)
+        try:
+            update = await self._api.execute.deployStack(
+                DeployStack(stack=self._stack_id)
+            )
+            update = await wait_for_completion(
+                self._api,
+                update,
+                f"Deploy stack {self._stack_name}",
+            )
+            await self.coordinator.async_request_refresh()
+        except Exception as e:
+            _LOGGER.error("Failed to deploy stack %s: %s", self._stack_name, e)
+            raise
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Stop the stack."""
+        _LOGGER.info("Stopping stack %s", self._stack_name)
+        try:
+            update = await self._api.execute.stopStack(
+                StopStack(stack=self._stack_id)
+            )
+            update = await wait_for_completion(
+                self._api,
+                update,
+                f"Stop stack {self._stack_name}",
+            )
+            await self.coordinator.async_request_refresh()
+        except Exception as e:
+            _LOGGER.error("Failed to stop stack %s: %s", self._stack_name, e)
+            raise
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self._update_attrs()
+        self.async_write_ha_state()
+
+
+def create_switch_entities_for_stacks(
+    api: KomodoClient,
+    coordinator: KomodoCoordinator,
+    entry_id: str,
+) -> list[KomodoStackSwitch]:
+    """Create a deploy/stop switch for each stack."""
+    entities: list[KomodoStackSwitch] = []
+
+    for stack in coordinator.data.stacks.values():
+        device_info = create_stack_device_info(
+            stack.id, stack.name, stack.server_id
+        )
+
+        entity = KomodoStackSwitch(
+            coordinator=coordinator,
+            api=api,
+            item_id=f"{entry_id}_{stack.id}",
+            stack_id=stack.id,
+            stack_name=stack.name,
+            device_info=device_info,
+        )
+        entities.append(entity)
+
+    return entities
+
+
 def create_switch_entities_for_services(
     api: KomodoClient,
     coordinator: KomodoCoordinator,
@@ -156,5 +265,6 @@ async def async_setup_entry(
     """Setup switch platform."""
     komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
 
-    entities = create_switch_entities_for_services(komodo.api, komodo.coordinator, entry.entry_id)
-    async_add_entities(entities)
+    stack_switches = create_switch_entities_for_stacks(komodo.api, komodo.coordinator, entry.entry_id)
+    service_switches = create_switch_entities_for_services(komodo.api, komodo.coordinator, entry.entry_id)
+    async_add_entities(stack_switches + service_switches)
