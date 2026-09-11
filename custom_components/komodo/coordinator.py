@@ -4,23 +4,16 @@ import asyncio
 import logging
 import time
 from datetime import timedelta
-from typing import List
 
 from komodo_api.exceptions import KomodoException
-from komodo_api.types import InspectStackContainer, InspectStackContainerResponse
+from komodo_api.types import InspectStackContainer
 
 from komodo_api.lib import KomodoClient
 from komodo_api.types import (
-    ListServersResponse,
-    ListStacksResponse,
-    ListAlertsResponse,
     ListServers,
     ListStacks,
     ListAlerts,
-    ListStackServices,
-    ServerListItem,
-    StackListItem,
-    StackService,
+    GetSystemStats,
 )
 
 from homeassistant.core import HomeAssistant
@@ -49,7 +42,7 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             _LOGGER,
             # Name of the data. For logging purposes.
             name="KomodoData",
-            update_interval=timedelta(minutes=5),
+            update_interval=timedelta(minutes=1),
         )
         self.my_api = my_api
         self._service_timestamps: dict[tuple[str, str], float] = {}
@@ -101,7 +94,35 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
 
         await self._compute_update_info(data)
         await self._fetch_service_states(data)
+        await self._fetch_server_stats(data)
         return data
+
+    async def _fetch_server_stats(self, data: KomodoData):
+        """Fetch cpu/memory/disk/load stats for all servers.
+
+        Komodo core keeps these stats up to date by polling periphery
+        servers on its own schedule, so this reads from that cache
+        instead of triggering a live query per server.
+        """
+
+        async def fetch_one(server_id: str) -> None:
+            try:
+                stats = await self.my_api.read.getSystemStats(
+                    GetSystemStats(server=server_id)
+                )
+            except KomodoException as e:
+                _LOGGER.debug(
+                    "Failed to get system stats for server %s: %s", server_id, e.error
+                )
+                return
+            except Exception as e:
+                _LOGGER.error(
+                    "Failed to get system stats for server %s: %s", server_id, e
+                )
+                return
+            data.get_server(server_id).set_stats(stats)
+
+        await asyncio.gather(*(fetch_one(server_id) for server_id in data.servers))
 
     async def _compute_update_info(self, new_data: KomodoData):
         """Compute update info for services."""
