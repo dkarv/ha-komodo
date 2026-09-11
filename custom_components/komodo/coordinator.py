@@ -64,8 +64,10 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         # handled by the data update coordinator.
         async with asyncio.timeout(10):
             tasks = [
-                self.my_api.read.listServers(ListServers()),
-                self.my_api.read.listStacks(ListStacks()),
+                # limit=0 disables Komodo's default pagination (30 items per
+                # page), so all resources are returned in a single response.
+                self.my_api.read.listServers(ListServers(limit=0)),
+                self.my_api.read.listStacks(ListStacks(limit=0)),
                 self.my_api.read.listAlerts(
                     ListAlerts(
                         query={"resolved": False},
