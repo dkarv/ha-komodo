@@ -37,6 +37,30 @@
             },
             "service_count": {
                 "name": "Dienst Anzahl"
+            },
+            "cpu_usage": {
+                "name": "CPU Auslastung"
+            },
+            "memory_usage": {
+                "name": "Arbeitsspeicher Auslastung"
+            },
+            "disk_usage": {
+                "name": "Speicherplatz Auslastung"
+            },
+            "memory_total": {
+                "name": "Arbeitsspeicher Gesamt"
+            },
+            "memory_free": {
+                "name": "Arbeitsspeicher Frei"
+            },
+            "disk_total": {
+                "name": "Speicherplatz Gesamt"
+            },
+            "disk_free": {
+                "name": "Speicherplatz Frei"
+            },
+            "load_1m": {
+                "name": "Systemlast (1m)"
             }
         },
         "switch": {

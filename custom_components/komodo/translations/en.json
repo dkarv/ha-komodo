@@ -37,6 +37,30 @@
             },
             "service_count": {
                 "name": "Service Count"
+            },
+            "cpu_usage": {
+                "name": "CPU Usage"
+            },
+            "memory_usage": {
+                "name": "Memory Usage"
+            },
+            "disk_usage": {
+                "name": "Disk Usage"
+            },
+            "memory_total": {
+                "name": "Memory Total"
+            },
+            "memory_free": {
+                "name": "Memory Free"
+            },
+            "disk_total": {
+                "name": "Disk Total"
+            },
+            "disk_free": {
+                "name": "Disk Free"
+            },
+            "load_1m": {
+                "name": "Load Average (1m)"
             }
         },
         "switch": {

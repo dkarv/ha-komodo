@@ -3,11 +3,15 @@
 import logging
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
-from homeassistant.helpers.entity import Entity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.core import callback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ..const import DOMAIN
 from ..coordinator import KomodoCoordinator
@@ -45,6 +49,10 @@ class KomodoSensor(KomodoEntity, SensorEntity):
         extractor,
         key: str,
         device_info: DeviceInfo | None = None,
+        native_unit_of_measurement: str | None = None,
+        device_class: SensorDeviceClass | None = None,
+        state_class: SensorStateClass | None = None,
+        suggested_display_precision: int | None = None,
     ) -> None:
         """Initialize the sensor with the common coordinator."""
         KomodoEntity.__init__(
@@ -55,6 +63,11 @@ class KomodoSensor(KomodoEntity, SensorEntity):
             key=key,
             device_info=device_info,
         )
+        self._attr_native_unit_of_measurement = native_unit_of_measurement
+        if device_class is not None:
+            self._attr_device_class = device_class
+        self._attr_state_class = state_class
+        self._attr_suggested_display_precision = suggested_display_precision
         self._attr_native_value = self._extractor(self.coordinator.data)
 
     @callback
