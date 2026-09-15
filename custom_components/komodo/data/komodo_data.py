@@ -17,10 +17,16 @@ from .stack import KomodoStack
 class KomodoData:
     """Wrapper to represent all data fetched from the API."""
 
-    servers: Mapping[str, KomodoServer] = {}
-    stacks: Mapping[str, KomodoStack] = {}
-    alert_count: Optional[int] = None
-    alert_list: Optional[List[str]] = None
+    servers: Mapping[str, KomodoServer]
+    stacks: Mapping[str, KomodoStack]
+    alert_count: Optional[int]
+    alert_list: Optional[List[str]]
+
+    def __init__(self):
+        self.servers = {}
+        self.stacks = {}
+        self.alert_count = None
+        self.alert_list = None
 
     def add_servers(self, servers: ListServersResponse):
         """Add servers from response."""

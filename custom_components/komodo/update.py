@@ -24,7 +24,9 @@ _LOGGER = logging.getLogger(__name__)
 class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
     """Update entity for a service in a stack."""
 
-    _attr_supported_features = UpdateEntityFeature.INSTALL
+    _attr_supported_features = (
+        UpdateEntityFeature.INSTALL | UpdateEntityFeature.RELEASE_NOTES
+    )
 
     def __init__(
         self,
@@ -61,10 +63,21 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
             self._attr_installed_version = service.update_info.current_version
             self._attr_latest_version = service.update_info.new_version
             self._attr_title = f"{self._service_name}: "
+            self._attr_release_summary = service.update_info.release_summary
+            self._attr_release_url = service.update_info.release_url
         else:
             self._attr_installed_version = "0"
             self._attr_latest_version = "0"
             self._attr_title = None
+            self._attr_release_summary = None
+            self._attr_release_url = None
+
+    def release_notes(self) -> str | None:
+        """Return full release notes markdown for the pending update."""
+        service = self._find_service()
+        if service and service.update_info:
+            return service.update_info.release_notes
+        return None
 
     async def async_install(
         self, version: str | None, backup: bool, **kwargs: Any
