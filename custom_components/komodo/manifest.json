@@ -12,7 +12,8 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/dkarv/ha-komodo/issues",
   "requirements": [
-    "komodo-api==2.3.3"
+    "komodo-api==2.3.3",
+    "releaseprobe==0.2.1"
   ],
   "ssdp": [],
   "version": "1.3.0-beta1",

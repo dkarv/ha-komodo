@@ -4,9 +4,10 @@ import asyncio
 import logging
 import time
 from datetime import timedelta
+from functools import partial
 
 from komodo_api.exceptions import KomodoException
-from komodo_api.types import InspectStackContainer
+from komodo_api.types import InspectStackContainer, InspectStackContainerResponse
 
 from komodo_api.lib import KomodoClient
 from komodo_api.types import (
@@ -16,6 +17,8 @@ from komodo_api.types import (
     GetSystemStats,
 )
 
+from releaseprobe import check_for_update
+
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -24,6 +27,7 @@ from .data.stack import KomodoStack
 from .data.service import KomodoService, KomodoUpdateInfo
 
 _LOGGER = logging.getLogger(__name__)
+_RELEASEPROBE_LOGGER = _LOGGER.getChild("releaseprobe")
 
 # Substring of the error Komodo core returns when a stack has no container for
 # the service (see bin/core/src/api/read/stack.rs). The core sends it with the
@@ -127,7 +131,7 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
     async def _compute_update_info(self, new_data: KomodoData):
         """Compute update info for services."""
         for stack_id, stack in new_data.stacks.items():
-            previous_stack = self.data.stacks[stack_id] if self.data else None
+            previous_stack = self.data.stacks.get(stack_id) if self.data else None
             for service_id, service in stack.services.items():
                 previous_service = previous_stack.services.get(service_id) if previous_stack else None
                 await self._inspect_service_if_needed(stack, service, stack_id, previous_service)
@@ -146,7 +150,7 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         previous_update_info = previous_service.update_info if previous_service else None
         if (
             previous_update_info
-            and (now - previous_update_info.info.info_updated_at) < 7200
+            and (now - previous_update_info.info_updated_at) < 7200
         ):
             service.update_info = previous_update_info
         elif stack.has_inspectable_container:
@@ -194,5 +198,32 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             _LOGGER.error("Failed to inspect service %s in stack %s: %s", service.name, stack_id, e)
             return
         service.state = response.state
-        if service.update_available:
-            service.update_info = KomodoUpdateInfo(response, updated_at)
+        if service.update_available and service.update_info is None:
+            update_info = KomodoUpdateInfo(response, updated_at)
+            await self._probe_release_info(update_info, response)
+            service.update_info = update_info
+
+    async def _probe_release_info(
+        self, update_info: KomodoUpdateInfo, response: InspectStackContainerResponse
+    ) -> None:
+        """Query releaseprobe for the real new version and release notes."""
+        if not response.config or not response.config.image:
+            return
+        try:
+            # Passing the container's own labels lets releaseprobe resolve
+            # the current version for floating tags (e.g. `latest`) and
+            # skips a redundant registry round-trip for pinned ones.
+            check = await self.hass.async_add_executor_job(
+                partial(
+                    check_for_update,
+                    response.config.image,
+                    response.config.labels or {},
+                    logger=_RELEASEPROBE_LOGGER,
+                )
+            )
+        except Exception as e:
+            _LOGGER.debug(
+                "releaseprobe failed for image %s: %s", response.config.image, e
+            )
+            return
+        update_info.apply_release_info(check)
