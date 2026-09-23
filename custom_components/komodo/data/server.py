@@ -3,7 +3,7 @@ from komodo_api.types import (
     ServerListItem,
     ServerState,
     ResourceListItem,
-    SystemStats,
+    MinimalSystemStats,
 )
 
 
@@ -33,6 +33,8 @@ class KomodoServer:
         self.service_count = 0
         self.periphery_version = item.info.version
         self._reset_stats()
+        if item.info.stats:
+            self.set_stats(item.info.stats)
 
     def _reset_stats(self) -> None:
         self.cpu_percent = None
@@ -54,13 +56,13 @@ class KomodoServer:
         """Add services to this server."""
         self.service_count += count
 
-    def set_stats(self, stats: SystemStats) -> None:
-        """Update this server with system stats already collected by Komodo."""
+    def set_stats(self, stats: MinimalSystemStats) -> None:
+        """Update this server with the stats Komodo core caches per server."""
         self.cpu_percent = stats.cpu_perc
         self.memory_used_gb = stats.mem_used_gb
         self.memory_total_gb = stats.mem_total_gb
-        self.disk_used_gb = sum(disk.used_gb for disk in stats.disks)
-        self.disk_total_gb = sum(disk.total_gb for disk in stats.disks)
+        self.disk_used_gb = stats.disk_used_gb
+        self.disk_total_gb = stats.disk_total_gb
         if stats.load_average:
             self.load_average_1m = stats.load_average.one
 

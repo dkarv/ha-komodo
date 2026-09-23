@@ -1,6 +1,6 @@
 from komodo_api.types import (
     StackServiceWithUpdate,
-    InspectStackContainerResponse,
+    ContainerListItem,
     ContainerStateStatusEnum,
 )
 from releaseprobe import UpdateCheck
@@ -28,18 +28,17 @@ class KomodoUpdateInfo:
     release_url: str | None
     release_notes: str | None
 
-    def __init__(self, info: InspectStackContainerResponse, updated_at: float):
-        if info.config and info.config.labels:
-            self.current_version = info.config.labels.get(
-                "org.opencontainers.image.version", "0"
-            )
-        else:
-            self.current_version = "0"
+    def __init__(self, updated_at: float):
+        self.current_version = "0"
         self.new_version = "update available"
         self.info_updated_at = updated_at
         self.release_summary = None
         self.release_url = None
         self.release_notes = None
+
+    def apply_labels(self, labels: dict[str, str]) -> None:
+        """Take the current version from the container's labels."""
+        self.current_version = labels.get("org.opencontainers.image.version", "0")
 
     def apply_release_info(self, check: UpdateCheck) -> None:
         """Apply the result of a releaseprobe update check."""
@@ -59,18 +58,39 @@ class KomodoService:
     """Wrapper for a stack service (container)."""
 
     name: str
+    image: str
     update_available: bool
     state: ContainerStateStatusEnum | None
+    container_id: str | None
     update_info: KomodoUpdateInfo | None
 
     def __init__(self, item: StackServiceWithUpdate, update_info: KomodoUpdateInfo | None = None):
         self.name = item.service
+        self.image = item.image
         self.update_available = item.update_available
         self.state = None
+        self.container_id = None
         if item.update_available:
             self.update_info = update_info
         else:
             self.update_info = None
+
+    @property
+    def has_container(self) -> bool:
+        """True when Komodo reported a container for this service."""
+        return self.state is not None
+
+    def apply_container(self, container: ContainerListItem) -> None:
+        """Apply the container summary from ListAllStackServices.
+
+        Note: Komodo core never sends `labels` in container list items (too
+        big, skip_serializing on the Rust side), so those have to come from
+        inspectStackContainer - see KomodoCoordinator._fetch_container_labels.
+        """
+        self.state = container.state
+        self.container_id = container.id
+        if container.image:
+            self.image = container.image
 
     def apply_update_info(
         self,
