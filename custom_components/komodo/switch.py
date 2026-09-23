@@ -73,7 +73,7 @@ class KomodoServiceSwitch(CoordinatorEntity[KomodoCoordinator], SwitchEntity):
         service = self._find_service()
         if service and service.state is not None:
             # Service is "on" when state is RUNNING
-            self._attr_is_on = service.state.running
+            self._attr_is_on = service.state == ContainerStateStatusEnum.RUNNING
         else:
             self._attr_is_on = None
     
