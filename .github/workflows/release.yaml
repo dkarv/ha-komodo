@@ -19,7 +19,7 @@ jobs:
         run: |
           VERSION=$(jq -r '.version' custom_components/*/manifest.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          if echo "$VERSION" | grep -qE '-beta$'; then
+          if echo "$VERSION" | grep -qE -- '-beta[0-9]*$'; then
             echo "is_beta=true" >> $GITHUB_OUTPUT
             echo "Will publish as prerelease"
           else
