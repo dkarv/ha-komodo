@@ -53,7 +53,6 @@ class KomodoServiceSwitch(CoordinatorEntity[KomodoCoordinator], SwitchEntity):
         self._stack_name = stack_name
         self._service_name = service_name
         self._server_id = server_id
-        self._container = None
 
         self._attr_unique_id = f"{item_id}_switch"
         self._attr_device_info = device_info
@@ -79,11 +78,11 @@ class KomodoServiceSwitch(CoordinatorEntity[KomodoCoordinator], SwitchEntity):
             self._attr_is_on = None
     
     async def query_container(self) -> str:
-        """Query the container name."""
-        if self._container:
-            return self._container
+        """Query the container id."""
+        service = self._find_service()
+        if service and service.container_id:
+            return service.container_id
         response: InspectStackContainerResponse = await self._api.read.inspectStackContainer(InspectStackContainer(stack = self._stack_id, service = self._service_name))
-        self._container = response.id
         return response.id
 
     async def async_turn_on(self, **kwargs: Any) -> None:
