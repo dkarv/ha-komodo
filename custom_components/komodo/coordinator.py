@@ -41,6 +41,8 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             update_interval=timedelta(minutes=1),
         )
         self.my_api = my_api
+        # Komodo server id -> device registry id, filled in during entry setup.
+        self.server_device_ids: dict[str, str] = {}
 
     async def _async_update_data(self):
         """Fetch data from API endpoint.

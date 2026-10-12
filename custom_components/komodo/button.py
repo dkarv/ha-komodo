@@ -127,9 +127,7 @@ def create_deploy_buttons_for_stacks(
     entities: list[KomodoStackDeployButton] = []
 
     for stack in coordinator.data.stacks.values():
-        device_info = create_stack_device_info(
-            stack.id, stack.name, stack.server_id
-        )
+        device_info = create_stack_device_info(stack, coordinator.server_device_ids)
 
         entity = KomodoStackDeployButton(
             coordinator=coordinator,
