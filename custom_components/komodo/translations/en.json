@@ -12,7 +12,8 @@
             "user": {
                 "data": {
                     "code": "User-Code",
-                    "host": "Host"
+                    "host": "Host",
+                    "container_entities": "Enable container sensors"
                 }
             }
         }
@@ -61,11 +62,40 @@
             },
             "load_1m": {
                 "name": "Load Average (1m)"
+            },
+            "container_cpu_usage": {
+                "name": "{service} CPU Usage"
+            },
+            "container_memory_used": {
+                "name": "{service} Memory"
+            },
+            "container_network_rx": {
+                "name": "{service} Network Received"
+            },
+            "container_network_tx": {
+                "name": "{service} Network Sent"
+            },
+            "container_block_read": {
+                "name": "{service} Disk Read"
+            },
+            "container_block_write": {
+                "name": "{service} Disk Written"
             }
         },
         "switch": {
             "service": {
                 "name": "Service Status"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Container sensors",
+                "description": "Enables the diagnostic sensors (CPU, memory, network and disk I/O) of all containers. They can also be enabled one by one in the entity settings.",
+                "data": {
+                    "container_entities": "Enable container sensors"
+                }
             }
         }
     }

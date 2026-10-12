@@ -8,6 +8,7 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
@@ -53,6 +54,10 @@ class KomodoSensor(KomodoEntity, SensorEntity):
         device_class: SensorDeviceClass | None = None,
         state_class: SensorStateClass | None = None,
         suggested_display_precision: int | None = None,
+        suggested_unit_of_measurement: str | None = None,
+        entity_category: EntityCategory | None = None,
+        enabled_default: bool = True,
+        translation_placeholders: dict[str, str] | None = None,
     ) -> None:
         """Initialize the sensor with the common coordinator."""
         KomodoEntity.__init__(
@@ -68,6 +73,13 @@ class KomodoSensor(KomodoEntity, SensorEntity):
             self._attr_device_class = device_class
         self._attr_state_class = state_class
         self._attr_suggested_display_precision = suggested_display_precision
+        if suggested_unit_of_measurement is not None:
+            self._attr_suggested_unit_of_measurement = suggested_unit_of_measurement
+        if entity_category is not None:
+            self._attr_entity_category = entity_category
+        self._attr_entity_registry_enabled_default = enabled_default
+        if translation_placeholders is not None:
+            self._attr_translation_placeholders = translation_placeholders
         self._attr_native_value = self._extractor(self.coordinator.data)
 
     @callback

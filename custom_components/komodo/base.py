@@ -8,12 +8,14 @@ class KomodoBase:
     """Base class for Komodo integration, holding shared API client and coordinator."""
     api: KomodoClient
     coordinator: KomodoCoordinator
+    container_entities: bool
 
     def __init__(
         self, hass: HomeAssistant, host: str, init_options: ApiKeyInitOptions
     ) -> None:
         self.api = KomodoClient(host, init_options)
         self.coordinator = KomodoCoordinator(hass, self.api)
+        self.container_entities = False
 
     async def close(self) -> None:
         """Close the API connection."""
