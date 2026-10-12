@@ -44,6 +44,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = komodo
     await komodo.coordinator.async_config_entry_first_refresh()
 
+    # Register the server devices up front, so the stack devices of all platforms
+    # can reference them via their device registry id.
+    device_reg = dr.async_get(hass)
+    komodo.coordinator.server_device_ids = {
+        server.id: device_reg.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, server.id)},
+            name=server.name,
+            manufacturer="Komodo",
+            sw_version=server.periphery_version,
+        ).id
+        for server in komodo.coordinator.data.servers.values()
+    }
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 

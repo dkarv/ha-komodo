@@ -16,6 +16,6 @@
     "releaseprobe==0.2.1"
   ],
   "ssdp": [],
-  "version": "1.4.0",
+  "version": "1.5.0-beta",
   "zeroconf": []
 }

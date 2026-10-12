@@ -3,24 +3,36 @@ import re
 import asyncio
 from komodo_api.lib import KomodoClient
 from komodo_api.types import Update, UpdateStatus, GetUpdate
+from typing import TYPE_CHECKING
+from homeassistant.const import MAJOR_VERSION, MINOR_VERSION
 from homeassistant.helpers.device_registry import DeviceInfo
 from .const import DOMAIN
+
+if TYPE_CHECKING:
+    from .data.stack import KomodoStack
 
 import logging
 
 _LOGGER = logging.getLogger(__name__)
 
+# DeviceInfo accepts via_device_id (replacing the deprecated via_device) since HA 2026.8.
+_SUPPORTS_VIA_DEVICE_ID = (MAJOR_VERSION, MINOR_VERSION) >= (2026, 8)
+
 
 def create_stack_device_info(
-    stack_id: str, stack_name: str, server_id: str,
+    stack: "KomodoStack", server_device_ids: dict[str, str],
 ) -> DeviceInfo:
-    """Create device info for a stack."""
-    return DeviceInfo(
-        identifiers={(DOMAIN, stack_id)},
-        name=stack_name,
+    """Create device info for a stack, linked to the device of its server."""
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, stack.id)},
+        name=stack.name,
         manufacturer="Komodo",
-        via_device=(DOMAIN, server_id),
     )
+    if not _SUPPORTS_VIA_DEVICE_ID:
+        device_info["via_device"] = (DOMAIN, stack.server_id)
+    elif (server_device_id := server_device_ids.get(stack.server_id)) is not None:
+        device_info["via_device_id"] = server_device_id
+    return device_info
 
 
 def fix_host(host: str) -> str:
