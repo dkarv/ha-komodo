@@ -2,9 +2,12 @@ from komodo_api.types import (
     StackServiceWithUpdate,
     ContainerListItem,
     ContainerStateStatusEnum,
+    ContainerStats,
 )
 from releaseprobe import UpdateCheck
 from releaseprobe.changelog import ReleaseNote
+
+from ..utils import parse_docker_percent, parse_docker_size, split_docker_pair
 
 
 def _format_release_notes(notes: list[ReleaseNote]) -> str:
@@ -62,6 +65,7 @@ class KomodoService:
     update_available: bool
     state: ContainerStateStatusEnum | None
     container_id: str | None
+    stats: ContainerStats | None
     update_info: KomodoUpdateInfo | None
 
     def __init__(self, item: StackServiceWithUpdate, update_info: KomodoUpdateInfo | None = None):
@@ -70,6 +74,7 @@ class KomodoService:
         self.update_available = item.update_available
         self.state = None
         self.container_id = None
+        self.stats = None
         if item.update_available:
             self.update_info = update_info
         else:
@@ -89,8 +94,48 @@ class KomodoService:
         """
         self.state = container.state
         self.container_id = container.id
+        self.stats = container.stats
         if container.image:
             self.image = container.image
+
+    def _stats_pair(self, field: str) -> tuple[float | None, float | None]:
+        """Parse a 'a / b' docker stats field into two byte values."""
+        if self.stats is None:
+            return None, None
+        first, second = split_docker_pair(getattr(self.stats, field))
+        return parse_docker_size(first), parse_docker_size(second)
+
+    @property
+    def cpu_percent(self) -> float | None:
+        """CPU usage of the container in percent (can exceed 100 on multi-core)."""
+        if self.stats is None:
+            return None
+        return parse_docker_percent(self.stats.cpu_perc)
+
+    @property
+    def memory_used_bytes(self) -> float | None:
+        """Memory used by the container, in bytes."""
+        return self._stats_pair("mem_usage")[0]
+
+    @property
+    def network_rx_bytes(self) -> float | None:
+        """Network bytes received by the container."""
+        return self._stats_pair("net_io")[0]
+
+    @property
+    def network_tx_bytes(self) -> float | None:
+        """Network bytes sent by the container."""
+        return self._stats_pair("net_io")[1]
+
+    @property
+    def block_read_bytes(self) -> float | None:
+        """Bytes read from block devices by the container."""
+        return self._stats_pair("block_io")[0]
+
+    @property
+    def block_write_bytes(self) -> float | None:
+        """Bytes written to block devices by the container."""
+        return self._stats_pair("block_io")[1]
 
     def apply_update_info(
         self,

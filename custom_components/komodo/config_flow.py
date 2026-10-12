@@ -9,11 +9,17 @@ from komodo_api.lib import KomodoClient, ApiKeyInitOptions
 from komodo_api.types import GetVersion
 from komodo_api.exceptions import KomodoException
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from aiohttp import ClientConnectionError
 
-from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET
+from .const import (
+    DOMAIN,
+    CONF_HOST,
+    CONF_API_KEY,
+    CONF_API_SECRET,
+    CONF_CONTAINER_ENTITIES,
+)
 from .utils import fix_host
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,6 +37,10 @@ def _komodo_schema(
             vol.Required(CONF_API_SECRET, default=api_secret): str,
         }
     )
+
+
+def _container_entities_schema(enabled: bool = False):
+    return {vol.Optional(CONF_CONTAINER_ENTITIES, default=enabled): bool}
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -53,6 +63,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Create the options flow."""
+        return OptionsFlowHandler()
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -61,8 +79,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
-                user_input[CONF_HOST] = info["host"]
-                return self.async_create_entry(title=info["title"], data=user_input)
+                data = dict(user_input)
+                data[CONF_HOST] = info["host"]
+                container_entities = data.pop(CONF_CONTAINER_ENTITIES, False)
+                return self.async_create_entry(
+                    title=info["title"],
+                    data=data,
+                    options={CONF_CONTAINER_ENTITIES: container_entities},
+                )
             except ClientConnectionError:
                 _LOGGER.exception("Connection error setting up the Komodo api")
                 errors["base"] = "cannot_connect"
@@ -84,6 +108,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input[CONF_HOST],
                 user_input[CONF_API_KEY],
                 user_input[CONF_API_SECRET],
+            )
+        ).extend(
+            _container_entities_schema(
+                user_input.get(CONF_CONTAINER_ENTITIES, False) if user_input else False
             )
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
@@ -117,4 +145,24 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 api_secret=current.data[CONF_API_SECRET],
             ),
             errors=errors,
+        )
+
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle Komodo options."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                _container_entities_schema(
+                    self.config_entry.options.get(CONF_CONTAINER_ENTITIES, False)
+                )
+            ),
         )

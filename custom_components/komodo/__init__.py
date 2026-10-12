@@ -10,8 +10,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
-from .const import DOMAIN, CONF_HOST, CONF_API_KEY, CONF_API_SECRET
+from .const import (
+    DOMAIN,
+    CONF_HOST,
+    CONF_API_KEY,
+    CONF_API_SECRET,
+    CONF_CONTAINER_ENTITIES,
+)
 from .base import KomodoBase
+from .sensors.container import is_container_sensor
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.UPDATE, Platform.BUTTON, Platform.SWITCH]
@@ -33,12 +40,41 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await komodo.close()
         raise ConfigEntryNotReady from e
 
+    komodo.container_entities = entry.options.get(CONF_CONTAINER_ENTITIES, False)
     hass.data[DOMAIN][entry.entry_id] = komodo
     await komodo.coordinator.async_config_entry_first_refresh()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 
     return True
+
+
+async def _async_entry_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Enable or disable all container sensors when the option changes.
+
+    The listener also fires on reconfigure (data change), so only act when
+    the option really changed - otherwise individually enabled container
+    sensors would be disabled again.
+    """
+    komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
+    enabled = entry.options.get(CONF_CONTAINER_ENTITIES, False)
+    if enabled == komodo.container_entities:
+        return
+
+    entity_reg = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(entity_reg, entry.entry_id):
+        if not is_container_sensor(entity.unique_id):
+            continue
+        if enabled and entity.disabled_by == er.RegistryEntryDisabler.INTEGRATION:
+            entity_reg.async_update_entity(entity.entity_id, disabled_by=None)
+        elif not enabled and entity.disabled_by is None:
+            entity_reg.async_update_entity(
+                entity.entity_id, disabled_by=er.RegistryEntryDisabler.INTEGRATION
+            )
+
+    # Reload so newly created sensors pick up the new enabled default.
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

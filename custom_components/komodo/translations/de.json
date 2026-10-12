@@ -12,7 +12,8 @@
             "user": {
                 "data": {
                     "code": "User-Code",
-                    "host": "Host"
+                    "host": "Host",
+                    "container_entities": "Container-Sensoren aktivieren"
                 }
             }
         }
@@ -61,11 +62,40 @@
             },
             "load_1m": {
                 "name": "Systemlast (1m)"
+            },
+            "container_cpu_usage": {
+                "name": "{service} CPU Auslastung"
+            },
+            "container_memory_used": {
+                "name": "{service} Arbeitsspeicher"
+            },
+            "container_network_rx": {
+                "name": "{service} Netzwerk Empfangen"
+            },
+            "container_network_tx": {
+                "name": "{service} Netzwerk Gesendet"
+            },
+            "container_block_read": {
+                "name": "{service} Festplatte Gelesen"
+            },
+            "container_block_write": {
+                "name": "{service} Festplatte Geschrieben"
             }
         },
         "switch": {
             "service": {
                 "name": "Dienst Status"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Container-Sensoren",
+                "description": "Aktiviert die Diagnose-Sensoren (CPU, Arbeitsspeicher, Netzwerk- und Festplatten-I/O) aller Container. Sie können auch einzeln in den Entitätseinstellungen aktiviert werden.",
+                "data": {
+                    "container_entities": "Container-Sensoren aktivieren"
+                }
             }
         }
     }
