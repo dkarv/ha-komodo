@@ -16,7 +16,7 @@ from komodo_api.types import (
     ListAllStackServices,
 )
 
-from releaseprobe import check_for_update
+from releaseprobe import UnknownVersionError, check_for_update
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -197,9 +197,20 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                     logger=_RELEASEPROBE_LOGGER,
                 )
             )
+        except UnknownVersionError:
+            # Not a transient failure: the image uses a floating tag (e.g.
+            # `latest`) and doesn't label its version, so there's nothing to
+            # compare against until it's updated to an image that does.
+            _LOGGER.info(
+                "Cannot determine the installed version of %s: it uses a floating tag "
+                "and has no org.opencontainers.image.version label, so no new version "
+                "or release notes can be shown",
+                image,
+            )
+            return
         except Exception as e:
-            _LOGGER.debug(
-                "releaseprobe failed for image %s: %s", image, e
+            _LOGGER.warning(
+                "Failed to look up the new version and release notes for %s: %s", image, e
             )
             return
         update_info.apply_release_info(check)
