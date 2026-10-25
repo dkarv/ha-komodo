@@ -13,7 +13,7 @@
   "issue_tracker": "https://github.com/dkarv/ha-komodo/issues",
   "requirements": [
     "komodo-api==2.3.3",
-    "releaseprobe==0.2.1"
+    "releaseprobe==1.0.0"
   ],
   "ssdp": [],
   "version": "1.5.0-beta",
