@@ -57,7 +57,7 @@ HACS (Home Assistant Community Store) makes installation and updates simple. Sin
    - **Host:** The URL of your Komodo instance (e.g., `http://192.168.1.100:9120`).
    - **API Key:** Your Komodo API key.
    - **API Secret:** Your Komodo API secret.
-   - **Enable container sensors** (optional): Enables the per-container diagnostic sensors (see below).
+   - **Enable container CPU / memory / network / disk I/O sensors** (optional): Enables the per-container diagnostic sensors of that category (see below).
 5. Click **SUBMIT**. The integration will connect to your Komodo instance and create devices and entities automatically.
 
 ***
@@ -99,7 +99,7 @@ For every service the stack device additionally gets diagnostic sensors with the
 | `<Service Name>` Network Received / Sent | Total network traffic of the container |
 | `<Service Name>` Disk Read / Written | Total block I/O of the container |
 
-These sensors are **disabled by default**. Enable them all at once with the **Enable container sensors** option (during setup, or later via **Configure** on the integration), or enable single sensors in the entity settings. They have no state class, so Home Assistant does not keep long-term statistics for them.
+These sensors are **disabled by default**. Enable them for all containers at once per category (CPU, memory, network, disk I/O) with the **Enable container ... sensors** options (during setup, or later via **Configure** on the integration), or enable single sensors in the entity settings. They have no state class, so Home Assistant does not keep long-term statistics for them.
 
 
 ## Disclaimer

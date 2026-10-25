@@ -18,7 +18,8 @@ from .const import (
     CONF_HOST,
     CONF_API_KEY,
     CONF_API_SECRET,
-    CONF_CONTAINER_ENTITIES,
+    CONTAINER_CATEGORIES,
+    enabled_container_categories,
 )
 from .utils import fix_host
 
@@ -39,8 +40,11 @@ def _komodo_schema(
     )
 
 
-def _container_entities_schema(enabled: bool = False):
-    return {vol.Optional(CONF_CONTAINER_ENTITIES, default=enabled): bool}
+def _container_entities_schema(enabled: frozenset[str] = frozenset()):
+    return {
+        vol.Optional(category, default=category in enabled): bool
+        for category in CONTAINER_CATEGORIES
+    }
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -81,11 +85,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 info = await validate_input(self.hass, user_input)
                 data = dict(user_input)
                 data[CONF_HOST] = info["host"]
-                container_entities = data.pop(CONF_CONTAINER_ENTITIES, False)
+                options = {
+                    category: data.pop(category, False)
+                    for category in CONTAINER_CATEGORIES
+                }
                 return self.async_create_entry(
                     title=info["title"],
                     data=data,
-                    options={CONF_CONTAINER_ENTITIES: container_entities},
+                    options=options,
                 )
             except ClientConnectionError:
                 _LOGGER.exception("Connection error setting up the Komodo api")
@@ -111,7 +118,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         ).extend(
             _container_entities_schema(
-                user_input.get(CONF_CONTAINER_ENTITIES, False) if user_input else False
+                enabled_container_categories(user_input) if user_input else frozenset()
             )
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
@@ -162,7 +169,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 _container_entities_schema(
-                    self.config_entry.options.get(CONF_CONTAINER_ENTITIES, False)
+                    enabled_container_categories(self.config_entry.options)
                 )
             ),
         )

@@ -13,7 +13,10 @@
                 "data": {
                     "code": "User-Code",
                     "host": "Host",
-                    "container_entities": "Container-Sensoren aktivieren"
+                    "container_cpu": "Container-CPU-Sensoren aktivieren",
+                    "container_memory": "Container-Arbeitsspeicher-Sensoren aktivieren",
+                    "container_network": "Container-Netzwerk-Sensoren aktivieren",
+                    "container_disk": "Container-Festplatten-I/O-Sensoren aktivieren"
                 }
             }
         }
@@ -92,9 +95,12 @@
         "step": {
             "init": {
                 "title": "Container-Sensoren",
-                "description": "Aktiviert die Diagnose-Sensoren (CPU, Arbeitsspeicher, Netzwerk- und Festplatten-I/O) aller Container. Sie können auch einzeln in den Entitätseinstellungen aktiviert werden.",
+                "description": "Aktiviert die Diagnose-Sensoren aller Container, je Kategorie. Sie können auch einzeln in den Entitätseinstellungen aktiviert werden.",
                 "data": {
-                    "container_entities": "Container-Sensoren aktivieren"
+                    "container_cpu": "Container-CPU-Sensoren aktivieren",
+                    "container_memory": "Container-Arbeitsspeicher-Sensoren aktivieren",
+                    "container_network": "Container-Netzwerk-Sensoren aktivieren",
+                    "container_disk": "Container-Festplatten-I/O-Sensoren aktivieren"
                 }
             }
         }

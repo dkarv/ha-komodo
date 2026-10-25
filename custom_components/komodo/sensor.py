@@ -10,7 +10,7 @@ from .sensors.container import create_container_sensors
 from .sensors.server import create_server_sensors
 from .sensors.stack import create_stack_sensors
 
-from .const import DOMAIN, CONF_CONTAINER_ENTITIES
+from .const import DOMAIN, enabled_container_categories
 from .base import KomodoBase
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ async def async_setup_entry(
         + create_container_sensors(
             komodo.coordinator,
             entry.entry_id,
-            entry.options.get(CONF_CONTAINER_ENTITIES, False),
+            enabled_container_categories(entry.options),
         )
     )
 

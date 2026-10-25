@@ -7,8 +7,17 @@ from komodo_api.types import ContainerListItem, ContainerStateStatusEnum, Contai
 from custom_components.komodo.data.komodo_data import KomodoData
 from custom_components.komodo.sensors.container import (
     CONTAINER_SENSORS,
+    container_sensor_category,
     create_container_sensors,
-    is_container_sensor,
+)
+from custom_components.komodo.const import (
+    CONF_CONTAINER_CPU,
+    CONF_CONTAINER_DISK,
+    CONF_CONTAINER_ENTITIES,
+    CONF_CONTAINER_MEMORY,
+    CONF_CONTAINER_NETWORK,
+    CONTAINER_CATEGORIES,
+    enabled_container_categories,
 )
 
 from .test_komodo_data import _stack_item, _stack_service
@@ -45,7 +54,7 @@ def _by_id(sensors):
 
 
 def test_container_sensor_values():
-    sensors = _by_id(create_container_sensors(_coordinator(), "e", False))
+    sensors = _by_id(create_container_sensors(_coordinator(), "e", frozenset()))
     assert sensors["e_s1_web_container_cpu_usage"].native_value == 1.0
     assert sensors["e_s1_web_container_memory_used"].native_value == 12 * 1024**2
     assert sensors["e_s1_web_container_network_rx"].native_value == 1500
@@ -56,7 +65,10 @@ def test_container_sensor_values():
         assert sensors[f"e_s1_db_{key}"].native_value is None
 
 
-@pytest.mark.parametrize("enabled", [True, False])
+@pytest.mark.parametrize(
+    "enabled",
+    [frozenset(), frozenset(CONTAINER_CATEGORIES), frozenset({CONF_CONTAINER_CPU, CONF_CONTAINER_MEMORY})],
+)
 def test_container_sensor_attributes(enabled):
     sensors = create_container_sensors(_coordinator(), "e", enabled)
     assert len(sensors) == 2 * len(CONTAINER_SENSORS)
@@ -64,12 +76,25 @@ def test_container_sensor_attributes(enabled):
         # No state class -> no long-term statistics
         assert sensor.state_class is None
         assert sensor.entity_category == EntityCategory.DIAGNOSTIC
-        assert sensor.entity_registry_enabled_default is enabled
-        assert is_container_sensor(sensor.unique_id)
+        category = container_sensor_category(sensor.unique_id)
+        assert category in CONTAINER_CATEGORIES
+        assert sensor.entity_registry_enabled_default is (category in enabled)
 
 
-def test_is_container_sensor():
-    assert not is_container_sensor("e_s1_stack_state")
-    assert not is_container_sensor("e_s1_web_switch")
+def test_container_sensor_category():
+    assert container_sensor_category("e_s1_web_container_cpu_usage") == CONF_CONTAINER_CPU
+    assert container_sensor_category("e_s1_web_container_memory_used") == CONF_CONTAINER_MEMORY
+    assert container_sensor_category("e_s1_web_container_network_tx") == CONF_CONTAINER_NETWORK
+    assert container_sensor_category("e_s1_web_container_block_read") == CONF_CONTAINER_DISK
+    assert container_sensor_category("e_s1_stack_state") is None
+    assert container_sensor_category("e_s1_web_switch") is None
     # server CPU sensor
-    assert not is_container_sensor("e_srv1_cpu_usage")
+    assert container_sensor_category("e_srv1_cpu_usage") is None
+
+
+def test_enabled_container_categories():
+    assert enabled_container_categories({}) == frozenset()
+    assert enabled_container_categories({CONF_CONTAINER_CPU: True, CONF_CONTAINER_DISK: False}) == {CONF_CONTAINER_CPU}
+    # Legacy option enables all categories
+    assert enabled_container_categories({CONF_CONTAINER_ENTITIES: True}) == frozenset(CONTAINER_CATEGORIES)
+    assert enabled_container_categories({CONF_CONTAINER_ENTITIES: False}) == frozenset()

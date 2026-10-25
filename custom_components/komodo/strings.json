@@ -6,7 +6,10 @@
           "host": "[%key:common::config_flow::data::host%]",
           "key": "API Key",
           "secret": "API Secret",
-          "container_entities": "Enable container sensors"
+          "container_cpu": "Enable container CPU sensors",
+          "container_memory": "Enable container memory sensors",
+          "container_network": "Enable container network sensors",
+          "container_disk": "Enable container disk I/O sensors"
         }
       }
     },
@@ -100,9 +103,12 @@
     "step": {
       "init": {
         "title": "Container sensors",
-        "description": "Enables the diagnostic sensors (CPU, memory, network and disk I/O) of all containers. They can also be enabled one by one in the entity settings.",
+        "description": "Enables the diagnostic sensors of all containers, per category. They can also be enabled one by one in the entity settings.",
         "data": {
-          "container_entities": "Enable container sensors"
+          "container_cpu": "Enable container CPU sensors",
+          "container_memory": "Enable container memory sensors",
+          "container_network": "Enable container network sensors",
+          "container_disk": "Enable container disk I/O sensors"
         }
       }
     }
