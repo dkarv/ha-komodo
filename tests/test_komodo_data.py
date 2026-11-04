@@ -145,3 +145,43 @@ def test_unassigned_stack_does_not_create_unknown_server_device():
     assert stack.server_id is None
 
 
+def test_add_builds_and_sensor():
+    from komodo_api.types import BuildState
+    from custom_components.komodo.sensors.build import KomodoBuildStateSensor, create_build_sensors
+
+    data = KomodoData()
+    mock_build = MagicMock()
+    mock_build.id = "b123"
+    mock_build.name = "jarvis-backend"
+    mock_build.info.state = BuildState.OK
+    mock_build.info.version = "1.0.0"
+    mock_build.info.built_hash = "abc12345"
+    mock_build.info.latest_hash = "abc12345"
+    mock_build.info.repo = "FaserF/Jarvis"
+    mock_build.info.branch = "main"
+    mock_build.info.repo_link = "https://github.com/FaserF/Jarvis"
+    mock_build.info.last_built_at = "2026-11-04T05:00:00Z"
+    mock_build.info.builder_id = "builder_1"
+
+    data.add_builds([mock_build])
+    assert "b123" in data.builds
+    b = data.builds["b123"]
+    assert b.name == "jarvis-backend"
+    assert b.version == "1.0.0"
+    assert b.state == BuildState.OK
+
+    coordinator = MagicMock()
+    coordinator.data = data
+    coordinator.host_url = "https://komodo.example.com"
+    sensors = create_build_sensors(coordinator, "entry_1")
+    assert len(sensors) == 1
+    sensor = sensors[0]
+    assert isinstance(sensor, KomodoBuildStateSensor)
+    assert sensor._attr_entity_registry_enabled_default is False
+    assert sensor.native_value == "OK"
+    attrs = sensor.extra_state_attributes
+    assert attrs["version"] == "1.0.0"
+    assert attrs["built_hash"] == "abc12345"
+    assert attrs["repo"] == "FaserF/Jarvis"
+
+

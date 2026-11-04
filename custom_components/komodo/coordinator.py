@@ -15,6 +15,7 @@ from komodo_api.types import (
     ListStacks,
     ListAlerts,
     ListAllStackServices,
+    ListBuilds,
 )
 
 from releaseprobe import UnknownVersionError, check_for_update
@@ -73,12 +74,15 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 # from core's cached container list - one call instead of an
                 # inspectStackContainer (live periphery query) per service.
                 self.my_api.read.listAllStackServices(ListAllStackServices(limit=0)),
+                # Builds (CI/CD pipelines)
+                self.my_api.read.listBuilds(ListBuilds(limit=0)),
             ]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
             _LOGGER.debug("Server response: %s", responses[0])
             _LOGGER.debug("Stack response: %s", responses[1])
             _LOGGER.debug("Alert response: %s", responses[2])
             _LOGGER.debug("Stack services response: %s", responses[3])
+            _LOGGER.debug("Build response: %s", responses[4])
             data = KomodoData()
 
             # Servers
@@ -105,6 +109,12 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 _LOGGER.error("Error fetching stack services", exc_info=responses[3])
             else:
                 data.add_stack_services(responses[3])
+
+            # Builds (CI/CD)
+            if len(responses) > 4 and not isinstance(responses[4], Exception):
+                data.add_builds(responses[4])
+            elif len(responses) > 4 and isinstance(responses[4], Exception):
+                _LOGGER.debug("Error fetching builds: %s", responses[4])
 
         self._compute_update_info(data)
         return data

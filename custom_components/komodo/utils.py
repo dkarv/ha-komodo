@@ -10,6 +10,7 @@ from .const import DOMAIN
 
 if TYPE_CHECKING:
     from .data.stack import KomodoStack
+    from .data.build import KomodoBuild
 
 import logging
 
@@ -44,6 +45,27 @@ def create_stack_device_info(
         elif (server_device_id := server_device_ids.get(stack.server_id)) is not None:
             device_info["via_device_id"] = server_device_id
     return device_info
+
+
+def create_build_device_info(
+    build: "KomodoBuild",
+    base_url: str | None = None,
+) -> DeviceInfo:
+    """Create device info for a build pipeline."""
+    config_url = f"{base_url.rstrip('/')}/builds/{build.name}" if base_url else None
+    sw_ver = None
+    if build.version:
+        sw_ver = build.version
+    elif build.built_hash:
+        sw_ver = build.built_hash[:8]
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"build_{build.id}")},
+        name=f"Build {build.name}",
+        manufacturer="Komodo",
+        model="CI/CD Build Pipeline",
+        sw_version=sw_ver,
+        configuration_url=config_url,
+    )
 
 
 def fix_host(host: str) -> str:

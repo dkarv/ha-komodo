@@ -4,12 +4,14 @@ from typing import List, Mapping, Optional
 from komodo_api.types import (
     ListAlertsResponse,
     ListAllStackServicesResponse,
+    ListBuildsResponse,
     ListServersResponse,
     ListStacksResponse,
     ResourceTargetServer,
     ResourceTargetStack,
 )
 
+from .build import KomodoBuild
 from .server import KomodoServer
 from .service import KomodoService
 from .stack import KomodoStack
@@ -20,12 +22,14 @@ class KomodoData:
 
     servers: dict[str, KomodoServer]
     stacks: dict[str, KomodoStack]
+    builds: dict[str, KomodoBuild]
     alert_count: Optional[int]
     alert_list: Optional[List[str]]
 
     def __init__(self):
         self.servers = {}
         self.stacks = {}
+        self.builds = {}
         self.alert_count = None
         self.alert_list = None
 
@@ -62,6 +66,11 @@ class KomodoData:
 
             for service in _stack.info.services:
                 stack.add_service(KomodoService(service))
+
+    def add_builds(self, builds: ListBuildsResponse):
+        """Add builds from response."""
+        for build in builds:
+            self.builds[build.id] = KomodoBuild(build)
 
     def add_stack_services(self, services: ListAllStackServicesResponse):
         """Attach container state/image/labels/digests to the services from add_stacks.
