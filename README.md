@@ -1,5 +1,9 @@
 # HA-Komodo
 
+<p align="center">
+  <img src="custom_components/komodo/brand/banner.png" alt="Komodo Integration for Home Assistant" width="100%">
+</p>
+
 ## 🦎 Monitor Your Komodo Infrastructure in Home Assistant
 
 The **HA-Komodo** integration connects Home Assistant directly to your Komodo instance, pulling live information about your servers and stacks and organizing them into dedicated devices.
