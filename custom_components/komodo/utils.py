@@ -22,16 +22,17 @@ _SUPPORTS_VIA_DEVICE_ID = (MAJOR_VERSION, MINOR_VERSION) >= (2026, 8)
 def create_stack_device_info(
     stack: "KomodoStack", server_device_ids: dict[str, str],
 ) -> DeviceInfo:
-    """Create device info for a stack, linked to the device of its server."""
+    """Create device info for a stack, linked to the device of its server if assigned."""
     device_info = DeviceInfo(
         identifiers={(DOMAIN, stack.id)},
         name=stack.name,
         manufacturer="Komodo",
     )
-    if not _SUPPORTS_VIA_DEVICE_ID:
-        device_info["via_device"] = (DOMAIN, stack.server_id)
-    elif (server_device_id := server_device_ids.get(stack.server_id)) is not None:
-        device_info["via_device_id"] = server_device_id
+    if stack.server_id:
+        if not _SUPPORTS_VIA_DEVICE_ID:
+            device_info["via_device"] = (DOMAIN, stack.server_id)
+        elif (server_device_id := server_device_ids.get(stack.server_id)) is not None:
+            device_info["via_device_id"] = server_device_id
     return device_info
 
 

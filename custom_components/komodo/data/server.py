@@ -24,7 +24,10 @@ class KomodoServer:
     disk_total_gb: Optional[float]
     load_average_1m: Optional[float]
 
+    is_unknown: bool
+
     def __init__(self, item: ResourceListItem[ServerListItem]):
+        self.is_unknown = False
         self.state = item.info.state
         self.id = item.id
         self.name = item.name
@@ -99,11 +102,17 @@ class KomodoServer:
         return self.disk_total_gb - self.disk_used_gb
 
     @classmethod
-    def unknown(cls, server_id: str) -> "KomodoServer":
+    def unknown(cls, server_id: str, server_name: str | None = None) -> "KomodoServer":
         """Create unknown server."""
         self = cls.__new__(cls)
+        self.is_unknown = True
         self.id = server_id
-        self.name = f"Unknown Server {server_id}"
+        if server_name:
+            self.name = server_name
+        elif server_id:
+            self.name = f"Unknown Server {server_id}"
+        else:
+            self.name = "Unassigned Server"
         self.state = None
         self.alerts = []
         self.stack_count = 0

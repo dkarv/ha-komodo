@@ -126,3 +126,22 @@ def test_service_effective_image_and_installed_version():
     dind.update_info = uinfo
     assert dind.installed_version == "29.9.1"
 
+
+def test_unassigned_stack_does_not_create_unknown_server_device():
+    data = KomodoData()
+    mock_stack = MagicMock()
+    mock_stack.id = "s_unassigned"
+    mock_stack.name = "pr-agent"
+    mock_stack.info.server_id = ""
+    mock_stack.info.server_name = ""
+    mock_stack.info.services = []
+    data.add_stacks([mock_stack])
+
+    # No empty string key or unknown server added
+    assert "" not in data.servers
+    assert len(data.servers) == 0
+
+    stack = data.stacks["s_unassigned"]
+    assert stack.server_id is None
+
+

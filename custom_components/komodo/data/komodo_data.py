@@ -34,12 +34,16 @@ class KomodoData:
         for server in servers:
             self.servers[server.id] = KomodoServer(server)
 
-    def get_server(self, server_id: str) -> KomodoServer:
-        """Get server by ID."""
+    def get_server(self, server_id: str | None, server_name: str | None = None) -> KomodoServer | None:
+        """Get server by ID, creating unknown server placeholder only if ID is non-empty."""
+        if not server_id:
+            return None
         server = self.servers.get(server_id)
         if server is None:
-            server = KomodoServer.unknown(server_id)
+            server = KomodoServer.unknown(server_id, server_name=server_name)
             self.servers[server_id] = server
+        elif server_name and server.is_unknown and server.name.startswith("Unknown Server"):
+            server.name = server_name
         return server
 
     def add_stacks(self, stacks: ListStacksResponse):
@@ -50,10 +54,11 @@ class KomodoData:
             stack = KomodoStack(_stack)
             self.stacks[_stack.id] = stack
 
-            # Update server stack count
-            server = self.get_server(_stack.info.server_id)
-            server.add_stack()
-            server.add_services(len(_stack.info.services))
+            # Update server stack count if assigned to a server
+            server = self.get_server(stack.server_id, server_name=stack.server_name)
+            if server:
+                server.add_stack()
+                server.add_services(len(_stack.info.services))
 
             for service in _stack.info.services:
                 stack.add_service(KomodoService(service))
@@ -89,6 +94,8 @@ class KomodoData:
         self.alert_list = [alert.data.type for alert in alerts.alerts]
         for alert in alerts.alerts:
             if isinstance(alert.target, ResourceTargetServer):
-                self.get_server(alert.target.id).add_alert(alert)
+                srv = self.get_server(alert.target.id)
+                if srv:
+                    srv.add_alert(alert)
             elif isinstance(alert.target, ResourceTargetStack):
                 self.get_stack(alert.target.id).add_alert(alert)

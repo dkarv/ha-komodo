@@ -15,6 +15,8 @@ def create_server_sensors(
     """Return a list of sensors, one device per server."""
     sensors: list[KomodoSensor] = []
     for server in coordinator.data.servers.values():
+        if not server.id or server.is_unknown:
+            continue
         device_info = DeviceInfo(
             identifiers={(DOMAIN, server.id)},
             name=server.name,

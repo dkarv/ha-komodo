@@ -14,7 +14,8 @@ class KomodoStack:
     state: StackState | None
     id: str
     name: str
-    server_id: str
+    server_id: str | None
+    server_name: str | None
     repo_link: str | None
     git_provider: str | None
     repo: str | None
@@ -26,7 +27,10 @@ class KomodoStack:
         self.state = item.info.state
         self.id = item.id
         self.name = item.name
-        self.server_id = item.info.server_id
+        sid = getattr(item.info, "server_id", None)
+        self.server_id = sid if sid else None
+        sname = getattr(item.info, "server_name", None)
+        self.server_name = sname if sname else None
         self.repo_link = getattr(item.info, "repo_link", None)
         self.git_provider = getattr(item.info, "git_provider", None)
         self.repo = getattr(item.info, "repo", None)
@@ -49,7 +53,8 @@ class KomodoStack:
         self.state = None
         self.id = stack_id
         self.name = f"Unknown Stack {stack_id}"
-        self.server_id = "unknown"
+        self.server_id = None
+        self.server_name = None
         self.repo_link = None
         self.git_provider = None
         self.repo = None
