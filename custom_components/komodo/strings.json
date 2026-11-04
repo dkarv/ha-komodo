@@ -33,6 +33,15 @@
       "stack_state": {
         "name": "Stack State"
       },
+      "build_state": {
+        "name": "Build State"
+      },
+      "procedure_state": {
+        "name": "Procedure State"
+      },
+      "action_state": {
+        "name": "Action State"
+      },
       "alert_count": {
         "name": "Alert Count"
       },
@@ -96,6 +105,42 @@
     "switch": {
       "service": {
         "name": "Service Status"
+      }
+    }
+  },
+  "services": {
+    "prune_docker": {
+      "name": "Prune Docker resources",
+      "description": "Prune dangling images, stopped containers, buildx cache, or system resources on a Komodo server.",
+      "fields": {
+        "server": {
+          "name": "Server",
+          "description": "The Komodo server name or ID to prune (leave empty to prune all connected servers)."
+        },
+        "prune_type": {
+          "name": "Prune type",
+          "description": "Type of Docker resources to prune (system, images, containers, volumes, buildx)."
+        }
+      }
+    },
+    "restart_all_containers": {
+      "name": "Restart all containers",
+      "description": "Gracefully restart all running Docker containers on a specific Komodo server.",
+      "fields": {
+        "server": {
+          "name": "Server",
+          "description": "The Komodo server name or ID."
+        }
+      }
+    },
+    "global_auto_update": {
+      "name": "Global auto update",
+      "description": "Trigger a global auto-update batch across all stacks and deployments in Komodo.",
+      "fields": {
+        "skip_auto_update": {
+          "name": "Skip auto-update flag check",
+          "description": "Whether to force update resources regardless of their auto-update configuration."
+        }
       }
     }
   },

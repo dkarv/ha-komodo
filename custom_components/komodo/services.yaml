@@ -1,0 +1,54 @@
+prune_docker:
+  name: Prune Docker Resources
+  description: Prune dangling images, stopped containers, buildx cache, or system resources on a Komodo server.
+  fields:
+    server:
+      name: Server
+      description: The Komodo server name or ID to prune (leave empty to prune all connected servers).
+      required: false
+      example: "oracle-vm"
+      selector:
+        text:
+    prune_type:
+      name: Prune Type
+      description: Type of Docker resources to prune.
+      required: false
+      default: "system"
+      example: "images"
+      selector:
+        select:
+          options:
+            - label: "Full System Prune"
+              value: "system"
+            - label: "Unused Images"
+              value: "images"
+            - label: "Stopped Containers"
+              value: "containers"
+            - label: "Unused Volumes"
+              value: "volumes"
+            - label: "Buildx Cache"
+              value: "buildx"
+
+restart_all_containers:
+  name: Restart All Containers
+  description: Gracefully restart all running Docker containers on a specific Komodo server.
+  fields:
+    server:
+      name: Server
+      description: The Komodo server name or ID.
+      required: true
+      example: "oracle-vm"
+      selector:
+        text:
+
+global_auto_update:
+  name: Global Auto Update
+  description: Trigger a global auto-update batch across all stacks and deployments in Komodo.
+  fields:
+    skip_auto_update:
+      name: Skip Auto-Update Flag Check
+      description: Whether to force update resources regardless of their auto-update configuration.
+      required: false
+      default: false
+      selector:
+        boolean:

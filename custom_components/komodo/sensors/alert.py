@@ -20,17 +20,28 @@ def create_alert_sensors(
             return ", ".join(data.alert_list)
         return ""
 
+    base_url = coordinator.host_url
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_global")},
+        name="Komodo Alerts",
+        manufacturer="Komodo",
+        sw_version=coordinator.komodo_version,
+        configuration_url=f"{base_url.rstrip('/')}/alerts" if base_url else None,
+    )
+
     return [
         KomodoSensor(
             coordinator=coordinator,
             item_id=f"{entry_id}_global",
             extractor=counter,
             key="alert_count",
+            device_info=device_info,
         ),
         KomodoSensor(
             coordinator=coordinator,
             item_id=f"{entry_id}_global",
             extractor=joiner,
             key="alert_list",
+            device_info=device_info,
         ),
     ]
