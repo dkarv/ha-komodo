@@ -30,6 +30,9 @@
             "stack_state": {
                 "name": "Stack State"
             },
+            "build_state": {
+                "name": "Build State"
+            },
             "alert_count": {
                 "name": "Alert Count"
             },

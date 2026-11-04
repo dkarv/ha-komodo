@@ -2,6 +2,7 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from komodo_api.types import (
@@ -11,19 +12,23 @@ from komodo_api.types import (
     ProcedureListItemInfo,
     RunProcedure,
     DeployStack,
+    RunBuild,
 )
 from komodo_api.lib import KomodoClient
 
 from custom_components.komodo.base import KomodoBase
 from custom_components.komodo.const import DOMAIN
 from custom_components.komodo.coordinator import KomodoCoordinator
-from custom_components.komodo.utils import wait_for_completion, create_stack_device_info
+from custom_components.komodo.utils import (
+    wait_for_completion,
+    create_stack_device_info,
+    create_build_device_info,
+)
 
 import logging
 
 _LOGGER = logging.getLogger(__name__)
 
-import logging
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -47,7 +52,12 @@ async def async_setup_entry(
         komodo.coordinator, komodo.api, entry.entry_id
     )
 
-    async_add_entities(procedure_entities + deploy_entities)
+    # Build run buttons (disabled by default)
+    build_entities = create_build_buttons(
+        komodo.coordinator, komodo.api, entry.entry_id
+    )
+
+    async_add_entities(procedure_entities + deploy_entities + build_entities)
 
 
 
@@ -127,7 +137,9 @@ def create_deploy_buttons_for_stacks(
     entities: list[KomodoStackDeployButton] = []
 
     for stack in coordinator.data.stacks.values():
-        device_info = create_stack_device_info(stack, coordinator.server_device_ids)
+        device_info = create_stack_device_info(
+            stack, coordinator.server_device_ids, base_url=coordinator.host_url
+        )
 
         entity = KomodoStackDeployButton(
             coordinator=coordinator,
@@ -135,6 +147,74 @@ def create_deploy_buttons_for_stacks(
             item_id=f"{entry_id}_{stack.id}",
             stack_id=stack.id,
             stack_name=stack.name,
+            device_info=device_info,
+        )
+        entities.append(entity)
+
+    return entities
+
+
+class KomodoBuildRunButton(CoordinatorEntity[KomodoCoordinator], ButtonEntity):
+    """Button entity to trigger a build pipeline."""
+
+    _attr_entity_registry_enabled_default = False
+    _attr_icon = "mdi:hammer-wrench"
+
+    def __init__(
+        self,
+        coordinator: KomodoCoordinator,
+        api: KomodoClient,
+        item_id: str,
+        build_id: str,
+        build_name: str,
+        device_info: DeviceInfo,
+    ) -> None:
+        """Initialize the build button entity."""
+        super().__init__(coordinator)
+        self._api = api
+        self._build_id = build_id
+        self._build_name = build_name
+        self._attr_unique_id = f"{item_id}_run_button"
+        self._attr_device_info = device_info
+        self._attr_name = f"Run {build_name} build"
+
+    async def async_press(self) -> None:
+        """Trigger the build."""
+        _LOGGER.info("Starting build %s", self._build_name)
+        try:
+            update = await self._api.execute.runBuild(
+                RunBuild(build=self._build_id)
+            )
+            update = await wait_for_completion(
+                self._api,
+                update,
+                f"Run build {self._build_name}",
+            )
+            _LOGGER.info("Completed build %s", self._build_name)
+            await self.coordinator.async_request_refresh()
+        except Exception as e:
+            _LOGGER.error("Failed to run build %s: %s", self._build_name, e)
+            raise
+
+
+def create_build_buttons(
+    coordinator: KomodoCoordinator,
+    api: KomodoClient,
+    entry_id: str,
+) -> list[KomodoBuildRunButton]:
+    """Create run build button for each build pipeline."""
+    entities: list[KomodoBuildRunButton] = []
+    if not coordinator.data or not coordinator.data.builds:
+        return entities
+
+    for build in coordinator.data.builds.values():
+        device_info = create_build_device_info(build, base_url=coordinator.host_url)
+        entity = KomodoBuildRunButton(
+            coordinator=coordinator,
+            api=api,
+            item_id=f"{entry_id}_{build.id}",
+            build_id=build.id,
+            build_name=build.name,
             device_info=device_info,
         )
         entities.append(entity)
