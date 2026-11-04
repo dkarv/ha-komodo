@@ -6,11 +6,8 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from komodo_api.types import (
-    ListProcedures,
-    ListProceduresResponse,
-    ResourceListItem,
-    ProcedureListItemInfo,
     RunProcedure,
+    RunAction,
     DeployStack,
     RunBuild,
 )
@@ -23,6 +20,8 @@ from custom_components.komodo.utils import (
     wait_for_completion,
     create_stack_device_info,
     create_build_device_info,
+    create_procedure_device_info,
+    create_action_device_info,
 )
 
 import logging
@@ -35,18 +34,16 @@ async def async_setup_entry(
 ):
     komodo: KomodoBase = hass.data[DOMAIN][entry.entry_id]
 
-    # Procedure buttons
-    try:
-        procedures: ListProceduresResponse = await komodo.api.read.listProcedures(
-            ListProcedures()
-        )
-        procedure_entities = [
-            KomodoProcedureButton(komodo.api, entry.entry_id, procedure)
-            for procedure in procedures
-        ]
-    except Exception:
-        procedure_entities = []
-    
+    # Procedure buttons (disabled by default)
+    procedure_entities = create_procedure_buttons(
+        komodo.coordinator, komodo.api, entry.entry_id
+    )
+
+    # Action buttons (disabled by default)
+    action_entities = create_action_buttons(
+        komodo.coordinator, komodo.api, entry.entry_id
+    )
+
     # Stack deploy buttons
     deploy_entities = create_deploy_buttons_for_stacks(
         komodo.coordinator, komodo.api, entry.entry_id
@@ -57,33 +54,91 @@ async def async_setup_entry(
         komodo.coordinator, komodo.api, entry.entry_id
     )
 
-    async_add_entities(procedure_entities + deploy_entities + build_entities)
+    async_add_entities(
+        procedure_entities + action_entities + deploy_entities + build_entities
+    )
 
 
+class KomodoProcedureButton(CoordinatorEntity[KomodoCoordinator], ButtonEntity):
+    """Button entity to run a procedure runbook."""
 
-class KomodoProcedureButton(ButtonEntity):
+    _attr_entity_registry_enabled_default = False
+    _attr_icon = "mdi:play-speed"
+
     def __init__(
         self,
+        coordinator: KomodoCoordinator,
         api: KomodoClient,
-        id: str,
-        procedure: ResourceListItem[ProcedureListItemInfo],
-    ):
+        item_id: str,
+        procedure_id: str,
+        procedure_name: str,
+        device_info: DeviceInfo,
+    ) -> None:
+        """Initialize the procedure button entity."""
+        super().__init__(coordinator)
         self._api = api
-        self._procedure = procedure
-        entity_id = f"button_{procedure.id}"
-        self.entity_id = f"button.{DOMAIN}_{entity_id}"
-        self._attr_unique_id = f"{id}_{entity_id}"
-        self._attr_name = f"Procedure {procedure.name}"
+        self._procedure_id = procedure_id
+        self._procedure_name = procedure_name
+        self._attr_unique_id = f"{item_id}_run_button"
+        self._attr_device_info = device_info
+        self._attr_name = f"Run {procedure_name} procedure"
 
     async def async_press(self) -> None:
-        _LOGGER.info("Starting procedure %s", self._procedure.name)
-        update = await self._api.execute.runProcedure(
-            RunProcedure(procedure=self._procedure.id)
-        )
-        update = await wait_for_completion(
-            self._api, update, f"Procedure {self._procedure.name}"
-        )
-        _LOGGER.info("Completed procedure %s", self._procedure.name)
+        """Trigger the procedure."""
+        _LOGGER.info("Starting procedure %s", self._procedure_name)
+        try:
+            update = await self._api.execute.runProcedure(
+                RunProcedure(procedure=self._procedure_id)
+            )
+            update = await wait_for_completion(
+                self._api, update, f"Procedure {self._procedure_name}"
+            )
+            _LOGGER.info("Completed procedure %s", self._procedure_name)
+            await self.coordinator.async_request_refresh()
+        except Exception as e:
+            _LOGGER.error("Failed to run procedure %s: %s", self._procedure_name, e)
+            raise
+
+
+class KomodoActionButton(CoordinatorEntity[KomodoCoordinator], ButtonEntity):
+    """Button entity to run a custom action command."""
+
+    _attr_entity_registry_enabled_default = False
+    _attr_icon = "mdi:script-text-play"
+
+    def __init__(
+        self,
+        coordinator: KomodoCoordinator,
+        api: KomodoClient,
+        item_id: str,
+        action_id: str,
+        action_name: str,
+        device_info: DeviceInfo,
+    ) -> None:
+        """Initialize the action button entity."""
+        super().__init__(coordinator)
+        self._api = api
+        self._action_id = action_id
+        self._action_name = action_name
+        self._attr_unique_id = f"{item_id}_run_button"
+        self._attr_device_info = device_info
+        self._attr_name = f"Run {action_name} action"
+
+    async def async_press(self) -> None:
+        """Trigger the action."""
+        _LOGGER.info("Starting action %s", self._action_name)
+        try:
+            update = await self._api.execute.runAction(
+                RunAction(action=self._action_id)
+            )
+            update = await wait_for_completion(
+                self._api, update, f"Action {self._action_name}"
+            )
+            _LOGGER.info("Completed action %s", self._action_name)
+            await self.coordinator.async_request_refresh()
+        except Exception as e:
+            _LOGGER.error("Failed to run action %s: %s", self._action_name, e)
+            raise
 
 
 class KomodoStackDeployButton(CoordinatorEntity[KomodoCoordinator], ButtonEntity):
@@ -215,6 +270,58 @@ def create_build_buttons(
             item_id=f"{entry_id}_{build.id}",
             build_id=build.id,
             build_name=build.name,
+            device_info=device_info,
+        )
+        entities.append(entity)
+
+    return entities
+
+
+def create_procedure_buttons(
+    coordinator: KomodoCoordinator,
+    api: KomodoClient,
+    entry_id: str,
+) -> list[KomodoProcedureButton]:
+    """Create run procedure button for each procedure."""
+    entities: list[KomodoProcedureButton] = []
+    if not coordinator.data or not coordinator.data.procedures:
+        return entities
+
+    for procedure in coordinator.data.procedures.values():
+        device_info = create_procedure_device_info(
+            procedure, base_url=coordinator.host_url
+        )
+        entity = KomodoProcedureButton(
+            coordinator=coordinator,
+            api=api,
+            item_id=f"{entry_id}_{procedure.id}",
+            procedure_id=procedure.id,
+            procedure_name=procedure.name,
+            device_info=device_info,
+        )
+        entities.append(entity)
+
+    return entities
+
+
+def create_action_buttons(
+    coordinator: KomodoCoordinator,
+    api: KomodoClient,
+    entry_id: str,
+) -> list[KomodoActionButton]:
+    """Create run action button for each action."""
+    entities: list[KomodoActionButton] = []
+    if not coordinator.data or not coordinator.data.actions:
+        return entities
+
+    for action in coordinator.data.actions.values():
+        device_info = create_action_device_info(action, base_url=coordinator.host_url)
+        entity = KomodoActionButton(
+            coordinator=coordinator,
+            api=api,
+            item_id=f"{entry_id}_{action.id}",
+            action_id=action.id,
+            action_name=action.name,
             device_info=device_info,
         )
         entities.append(entity)

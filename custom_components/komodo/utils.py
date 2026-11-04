@@ -11,6 +11,8 @@ from .const import DOMAIN
 if TYPE_CHECKING:
     from .data.stack import KomodoStack
     from .data.build import KomodoBuild
+    from .data.procedure import KomodoProcedure
+    from .data.action import KomodoAction
 
 import logging
 
@@ -64,6 +66,36 @@ def create_build_device_info(
         manufacturer="Komodo",
         model="CI/CD Build Pipeline",
         sw_version=sw_ver,
+        configuration_url=config_url,
+    )
+
+
+def create_procedure_device_info(
+    procedure: "KomodoProcedure",
+    base_url: str | None = None,
+) -> DeviceInfo:
+    """Create device info for a procedure."""
+    config_url = f"{base_url.rstrip('/')}/procedures/{procedure.name}" if base_url else None
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"procedure_{procedure.id}")},
+        name=f"Procedure {procedure.name}",
+        manufacturer="Komodo",
+        model="Procedure Runbook",
+        configuration_url=config_url,
+    )
+
+
+def create_action_device_info(
+    action: "KomodoAction",
+    base_url: str | None = None,
+) -> DeviceInfo:
+    """Create device info for an action."""
+    config_url = f"{base_url.rstrip('/')}/actions/{action.name}" if base_url else None
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"action_{action.id}")},
+        name=f"Action {action.name}",
+        manufacturer="Komodo",
+        model="Action Command",
         configuration_url=config_url,
     )
 

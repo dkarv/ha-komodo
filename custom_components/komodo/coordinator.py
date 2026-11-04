@@ -11,11 +11,13 @@ from komodo_api.exceptions import KomodoException
 from komodo_api.lib import KomodoClient
 from komodo_api.types import (
     InspectStackContainer,
-    ListServers,
-    ListStacks,
+    ListActions,
     ListAlerts,
     ListAllStackServices,
     ListBuilds,
+    ListProcedures,
+    ListServers,
+    ListStacks,
 )
 
 from releaseprobe import UnknownVersionError, check_for_update
@@ -76,6 +78,9 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 self.my_api.read.listAllStackServices(ListAllStackServices(limit=0)),
                 # Builds (CI/CD pipelines)
                 self.my_api.read.listBuilds(ListBuilds(limit=0)),
+                # Procedures & Actions (Runbooks & Automations)
+                self.my_api.read.listProcedures(ListProcedures(limit=0)),
+                self.my_api.read.listActions(ListActions(limit=0)),
             ]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
             _LOGGER.debug("Server response: %s", responses[0])
@@ -83,6 +88,8 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             _LOGGER.debug("Alert response: %s", responses[2])
             _LOGGER.debug("Stack services response: %s", responses[3])
             _LOGGER.debug("Build response: %s", responses[4])
+            _LOGGER.debug("Procedure response: %s", responses[5])
+            _LOGGER.debug("Action response: %s", responses[6])
             data = KomodoData()
 
             # Servers
@@ -115,6 +122,18 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 data.add_builds(responses[4])
             elif len(responses) > 4 and isinstance(responses[4], Exception):
                 _LOGGER.debug("Error fetching builds: %s", responses[4])
+
+            # Procedures
+            if len(responses) > 5 and not isinstance(responses[5], Exception):
+                data.add_procedures(responses[5])
+            elif len(responses) > 5 and isinstance(responses[5], Exception):
+                _LOGGER.debug("Error fetching procedures: %s", responses[5])
+
+            # Actions
+            if len(responses) > 6 and not isinstance(responses[6], Exception):
+                data.add_actions(responses[6])
+            elif len(responses) > 6 and isinstance(responses[6], Exception):
+                _LOGGER.debug("Error fetching actions: %s", responses[6])
 
         self._compute_update_info(data)
         return data

@@ -185,3 +185,53 @@ def test_add_builds_and_sensor():
     assert attrs["repo"] == "FaserF/Jarvis"
 
 
+def test_add_procedures_and_actions():
+    from komodo_api.types import ProcedureState, ActionState
+    from custom_components.komodo.sensors.automation import (
+        KomodoProcedureStateSensor,
+        KomodoActionStateSensor,
+        create_automation_sensors,
+    )
+
+    data = KomodoData()
+    mock_proc = MagicMock()
+    mock_proc.id = "p1"
+    mock_proc.name = "backup-db"
+    mock_proc.info.state = ProcedureState.OK
+    mock_proc.info.last_run_at = "2026-11-04T05:00:00Z"
+    mock_proc.info.next_scheduled_run = "2026-11-05T05:00:00Z"
+    mock_proc.info.schedule_error = None
+    mock_proc.info.stages = ["stop", "dump", "start"]
+
+    mock_act = MagicMock()
+    mock_act.id = "a1"
+    mock_act.name = "prune-cache"
+    mock_act.info.state = ActionState.OK
+    mock_act.info.last_run_at = "2026-11-04T05:30:00Z"
+    mock_act.info.next_scheduled_run = None
+    mock_act.info.schedule_error = None
+
+    data.add_procedures([mock_proc])
+    data.add_actions([mock_act])
+
+    assert "p1" in data.procedures
+    assert data.procedures["p1"].stages == 3
+    assert "a1" in data.actions
+    assert data.actions["a1"].name == "prune-cache"
+
+    coordinator = MagicMock()
+    coordinator.data = data
+    coordinator.host_url = "https://komodo.example.com"
+    sensors = create_automation_sensors(coordinator, "entry_1")
+    assert len(sensors) == 2
+
+    proc_sensor = [s for s in sensors if isinstance(s, KomodoProcedureStateSensor)][0]
+    assert proc_sensor._attr_entity_registry_enabled_default is False
+    assert proc_sensor.native_value == "OK"
+    assert proc_sensor.extra_state_attributes["stages"] == 3
+
+    act_sensor = [s for s in sensors if isinstance(s, KomodoActionStateSensor)][0]
+    assert act_sensor._attr_entity_registry_enabled_default is False
+    assert act_sensor.native_value == "OK"
+
+

@@ -2,16 +2,20 @@
 from typing import List, Mapping, Optional
 
 from komodo_api.types import (
+    ListActionsResponse,
     ListAlertsResponse,
     ListAllStackServicesResponse,
     ListBuildsResponse,
+    ListProceduresResponse,
     ListServersResponse,
     ListStacksResponse,
     ResourceTargetServer,
     ResourceTargetStack,
 )
 
+from .action import KomodoAction
 from .build import KomodoBuild
+from .procedure import KomodoProcedure
 from .server import KomodoServer
 from .service import KomodoService
 from .stack import KomodoStack
@@ -23,6 +27,8 @@ class KomodoData:
     servers: dict[str, KomodoServer]
     stacks: dict[str, KomodoStack]
     builds: dict[str, KomodoBuild]
+    procedures: dict[str, KomodoProcedure]
+    actions: dict[str, KomodoAction]
     alert_count: Optional[int]
     alert_list: Optional[List[str]]
 
@@ -30,6 +36,8 @@ class KomodoData:
         self.servers = {}
         self.stacks = {}
         self.builds = {}
+        self.procedures = {}
+        self.actions = {}
         self.alert_count = None
         self.alert_list = None
 
@@ -71,6 +79,16 @@ class KomodoData:
         """Add builds from response."""
         for build in builds:
             self.builds[build.id] = KomodoBuild(build)
+
+    def add_procedures(self, procedures: ListProceduresResponse):
+        """Add procedures from response."""
+        for procedure in procedures:
+            self.procedures[procedure.id] = KomodoProcedure(procedure)
+
+    def add_actions(self, actions: ListActionsResponse):
+        """Add actions from response."""
+        for action in actions:
+            self.actions[action.id] = KomodoAction(action)
 
     def add_stack_services(self, services: ListAllStackServicesResponse):
         """Attach container state/image/labels/digests to the services from add_stacks.
