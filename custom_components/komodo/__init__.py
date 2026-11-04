@@ -45,7 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await komodo.coordinator.async_config_entry_first_refresh()
 
     # Register the server devices up front, so the stack devices of all platforms
-    # can reference them via their device registry id.
+    # can reference them via their device registry id. Only register valid servers (skip empty IDs).
     device_reg = dr.async_get(hass)
     komodo.coordinator.server_device_ids = {
         server.id: device_reg.async_get_or_create(
@@ -56,6 +56,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             sw_version=server.periphery_version,
         ).id
         for server in komodo.coordinator.data.servers.values()
+        if server.id and not server.is_unknown
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
