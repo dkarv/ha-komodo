@@ -1,24 +1,25 @@
-"""The BWT Perla integration."""
+"""The Komodo integration."""
 
 import logging
 
-from custom_components.komodo import coordinator
-from komodo_api.lib import ApiKeyInitOptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
+from komodo_api.lib import ApiKeyInitOptions
 
+from .base import KomodoBase
 from .const import (
-    DOMAIN,
-    CONF_HOST,
     CONF_API_KEY,
     CONF_API_SECRET,
+    CONF_HOST,
+    DOMAIN,
     enabled_container_categories,
 )
-from .base import KomodoBase
 from .sensors.container import container_sensor_category
+from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.UPDATE, Platform.BUTTON, Platform.SWITCH]
@@ -32,6 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         entry.data[CONF_HOST],
         ApiKeyInitOptions(entry.data[CONF_API_KEY], entry.data[CONF_API_SECRET]),
+        entry_id=entry.entry_id,
     )
     try:
         await komodo.test_connection()
@@ -44,9 +46,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = komodo
     await komodo.coordinator.async_config_entry_first_refresh()
 
-    # Register the server devices up front, so the stack devices of all platforms
-    # can reference them via their device registry id.
+    # Register the main Komodo device and server devices up front, so the stack
+    # devices of all platforms can reference them via their device registry id.
     device_reg = dr.async_get(hass)
+    base_url = komodo.coordinator.host_url
+    device_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name="Komodo",
+        manufacturer="Komodo",
+        model="Fleet Controller",
+        sw_version=komodo.coordinator.komodo_version,
+        configuration_url=base_url,
+    )
+
     komodo.coordinator.server_device_ids = {
         server.id: device_reg.async_get_or_create(
             config_entry_id=entry.entry_id,
@@ -54,11 +67,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             name=server.name,
             manufacturer="Komodo",
             sw_version=server.periphery_version,
+            configuration_url=f"{base_url.rstrip('/')}/servers/{server.id}" if base_url else None,
+            via_device=(DOMAIN, entry.entry_id),
         ).id
         for server in komodo.coordinator.data.servers.values()
+        if server.id and not server.is_unknown
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await async_setup_services(hass)
+    komodo.start_websocket()
     entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 
     return True
@@ -99,6 +117,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         komodo = hass.data[DOMAIN].pop(entry.entry_id)
         await komodo.close()
+        await async_unload_services(hass)
 
     return unload_ok
 
