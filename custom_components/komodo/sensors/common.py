@@ -133,6 +133,7 @@ class KomodoOptionSensor(KomodoSensor):
         key: str,
         device_info: DeviceInfo,
         options: list[str],
+        enabled_default: bool = True,
     ) -> None:
         """Initialize the parent sensor."""
         self._attr_device_class = SensorDeviceClass.ENUM
@@ -143,4 +144,5 @@ class KomodoOptionSensor(KomodoSensor):
             extractor=extractor,
             key=key,
             device_info=device_info,
+            enabled_default=enabled_default,
         )
