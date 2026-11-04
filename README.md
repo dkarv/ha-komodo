@@ -1,5 +1,9 @@
 # HA-Komodo
 
+<p align="center">
+  <img src="custom_components/komodo/brand/banner.png" alt="Komodo Integration for Home Assistant" width="100%">
+</p>
+
 ## 🦎 Monitor Your Komodo Infrastructure in Home Assistant
 
 The **HA-Komodo** integration connects Home Assistant directly to your Komodo instance, pulling live information about your servers and stacks and organizing them into dedicated devices.
@@ -17,23 +21,21 @@ This gives you full visibility and basic control over your Komodo-managed infras
 
 ## Installation
 
-### 1. Installation via HACS My Home Assistant (Recommended)
+### 1. Installation via Home Assistant Marketplace / HACS (Recommended)
 
-The easiest way to install the Komodo integration is via HACS.
+The easiest way to install the Komodo integration is via the **Home Assistant Marketplace** (or HACS on earlier versions).
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dkarv&repository=ha-komodo&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store / Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dkarv&repository=ha-komodo&category=integration)
 
-### 2. Installation via HACS Manually
+### 2. Manual Repository Addition in Home Assistant Marketplace
 
-HACS (Home Assistant Community Store) makes installation and updates simple. Since this is a custom component, you must first add the repository to HACS.
-
-1. In Home Assistant, go to **HACS**.
+1. In Home Assistant, open **Marketplace** (or **HACS**).
 2. Go to the **Integrations** tab.
 3. Click the three dots **(⋮)** in the top right corner and select **Custom repositories**.
 4. Enter the URL: `https://github.com/dkarv/ha-komodo`
 5. Select **Integration** as the Category.
 6. Click **ADD**.
-7. After the repository is added, search for **"Komodo"** in the HACS Integrations section and click **Download**.
+7. After the repository is added, search for **"Komodo"** in the Marketplace Integrations section and click **Download**.
 8. **Restart Home Assistant** to load the new integration.
 
 ### 3. Manual Installation

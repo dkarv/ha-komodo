@@ -6,6 +6,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .sensors.alert import create_alert_sensors
+from .sensors.automation import create_automation_sensors
+from .sensors.build import create_build_sensors
 from .sensors.container import create_container_sensors
 from .sensors.server import create_server_sensors
 from .sensors.stack import create_stack_sensors
@@ -28,6 +30,8 @@ async def async_setup_entry(
         create_server_sensors(komodo.coordinator, entry.entry_id)
         + create_stack_sensors(komodo.coordinator, entry.entry_id)
         + create_alert_sensors(komodo.coordinator, entry.entry_id)
+        + create_build_sensors(komodo.coordinator, entry.entry_id)
+        + create_automation_sensors(komodo.coordinator, entry.entry_id)
         + create_container_sensors(
             komodo.coordinator,
             entry.entry_id,

@@ -30,6 +30,15 @@
             "stack_state": {
                 "name": "Stack State"
             },
+            "build_state": {
+                "name": "Build State"
+            },
+            "procedure_state": {
+                "name": "Procedure State"
+            },
+            "action_state": {
+                "name": "Action State"
+            },
             "alert_count": {
                 "name": "Alert Count"
             },
