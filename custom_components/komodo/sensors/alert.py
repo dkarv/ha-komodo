@@ -25,6 +25,7 @@ def create_alert_sensors(
         identifiers={(DOMAIN, f"{entry_id}_global")},
         name="Komodo Alerts",
         manufacturer="Komodo",
+        sw_version=coordinator.komodo_version,
         configuration_url=f"{base_url.rstrip('/')}/alerts" if base_url else None,
     )
 

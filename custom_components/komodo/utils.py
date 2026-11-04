@@ -26,10 +26,16 @@ def create_stack_device_info(
 ) -> DeviceInfo:
     """Create device info for a stack, linked to the device of its server if assigned."""
     config_url = f"{base_url.rstrip('/')}/stacks/{stack.name}" if base_url else None
+    sw_ver = None
+    if stack.deployed_hash:
+        sw_ver = stack.deployed_hash[:8]
+    elif stack.branch:
+        sw_ver = stack.branch
     device_info = DeviceInfo(
         identifiers={(DOMAIN, stack.id)},
         name=stack.name,
         manufacturer="Komodo",
+        sw_version=sw_ver,
         configuration_url=config_url,
     )
     if stack.server_id:

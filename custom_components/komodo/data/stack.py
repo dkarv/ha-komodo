@@ -20,6 +20,8 @@ class KomodoStack:
     git_provider: str | None
     repo: str | None
     branch: str | None
+    deployed_hash: str | None
+    latest_hash: str | None
     services: dict[str, KomodoService]
     alerts: List[str]
 
@@ -35,6 +37,8 @@ class KomodoStack:
         self.git_provider = getattr(item.info, "git_provider", None)
         self.repo = getattr(item.info, "repo", None)
         self.branch = getattr(item.info, "branch", None)
+        self.deployed_hash = getattr(item.info, "deployed_hash", None)
+        self.latest_hash = getattr(item.info, "latest_hash", None)
         self.services = {}
         self.alerts = []
 
@@ -59,6 +63,8 @@ class KomodoStack:
         self.git_provider = None
         self.repo = None
         self.branch = None
+        self.deployed_hash = None
+        self.latest_hash = None
         self.services = {}
         self.alerts = []
         return self
