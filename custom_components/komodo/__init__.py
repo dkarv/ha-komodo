@@ -45,6 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         entry.data[CONF_HOST],
         ApiKeyInitOptions(entry.data[CONF_API_KEY], entry.data[CONF_API_SECRET]),
+        entry_id=entry.entry_id,
     )
     try:
         await komodo.test_connection()
@@ -75,6 +76,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    komodo.start_websocket()
     entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 
     return True
