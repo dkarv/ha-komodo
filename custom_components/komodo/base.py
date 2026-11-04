@@ -2,6 +2,7 @@ from komodo_api.lib import KomodoClient, ApiKeyInitOptions
 from komodo_api.types import GetVersion
 from homeassistant.core import HomeAssistant
 from .coordinator import KomodoCoordinator
+from .utils import fix_host
 
 
 class KomodoBase:
@@ -15,6 +16,7 @@ class KomodoBase:
     ) -> None:
         self.api = KomodoClient(host, init_options)
         self.coordinator = KomodoCoordinator(hass, self.api)
+        self.coordinator.host_url = fix_host(host)
         self.container_categories = frozenset()
 
     async def close(self) -> None:

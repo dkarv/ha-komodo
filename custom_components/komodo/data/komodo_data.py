@@ -18,8 +18,8 @@ from .stack import KomodoStack
 class KomodoData:
     """Wrapper to represent all data fetched from the API."""
 
-    servers: Mapping[str, KomodoServer]
-    stacks: Mapping[str, KomodoStack]
+    servers: dict[str, KomodoServer]
+    stacks: dict[str, KomodoStack]
     alert_count: Optional[int]
     alert_list: Optional[List[str]]
 
@@ -34,12 +34,16 @@ class KomodoData:
         for server in servers:
             self.servers[server.id] = KomodoServer(server)
 
-    def get_server(self, server_id: str) -> KomodoServer:
-        """Get server by ID."""
+    def get_server(self, server_id: str | None, server_name: str | None = None) -> KomodoServer | None:
+        """Get server by ID, creating unknown server placeholder only if ID is non-empty."""
+        if not server_id:
+            return None
         server = self.servers.get(server_id)
         if server is None:
-            server = KomodoServer.unknown(server_id)
+            server = KomodoServer.unknown(server_id, server_name=server_name)
             self.servers[server_id] = server
+        elif server_name and server.is_unknown and server.name.startswith("Unknown Server"):
+            server.name = server_name
         return server
 
     def add_stacks(self, stacks: ListStacksResponse):
@@ -50,27 +54,31 @@ class KomodoData:
             stack = KomodoStack(_stack)
             self.stacks[_stack.id] = stack
 
-            # Update server stack count
-            server = self.get_server(_stack.info.server_id)
-            server.add_stack()
-            server.add_services(len(_stack.info.services))
+            # Update server stack count if assigned to a server
+            server = self.get_server(stack.server_id, server_name=stack.server_name)
+            if server:
+                server.add_stack()
+                server.add_services(len(_stack.info.services))
 
             for service in _stack.info.services:
                 stack.add_service(KomodoService(service))
 
     def add_stack_services(self, services: ListAllStackServicesResponse):
-        """Attach container state/image/labels to the services from add_stacks.
+        """Attach container state/image/labels/digests to the services from add_stacks.
 
         Must run after add_stacks. Services without a container (stack down,
         server unreachable, swarm mode) keep state None.
         """
         for item in services:
             stack = self.stacks.get(item.stack_id)
-            if stack is None or item.container is None:
+            if stack is None:
                 continue
             service = stack.services.get(item.service)
             if service is not None:
-                service.apply_container(item.container)
+                if hasattr(service, "apply_stack_service"):
+                    service.apply_stack_service(item)
+                elif item.container is not None:
+                    service.apply_container(item.container)
 
     def get_stack(self, stack_id: str) -> KomodoStack:
         """Get stack by ID."""
@@ -86,6 +94,8 @@ class KomodoData:
         self.alert_list = [alert.data.type for alert in alerts.alerts]
         for alert in alerts.alerts:
             if isinstance(alert.target, ResourceTargetServer):
-                self.get_server(alert.target.id).add_alert(alert)
+                srv = self.get_server(alert.target.id)
+                if srv:
+                    srv.add_alert(alert)
             elif isinstance(alert.target, ResourceTargetStack):
                 self.get_stack(alert.target.id).add_alert(alert)
