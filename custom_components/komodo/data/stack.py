@@ -15,6 +15,10 @@ class KomodoStack:
     id: str
     name: str
     server_id: str
+    repo_link: str | None
+    git_provider: str | None
+    repo: str | None
+    branch: str | None
     services: dict[str, KomodoService]
     alerts: List[str]
 
@@ -23,6 +27,10 @@ class KomodoStack:
         self.id = item.id
         self.name = item.name
         self.server_id = item.info.server_id
+        self.repo_link = getattr(item.info, "repo_link", None)
+        self.git_provider = getattr(item.info, "git_provider", None)
+        self.repo = getattr(item.info, "repo", None)
+        self.branch = getattr(item.info, "branch", None)
         self.services = {}
         self.alerts = []
 
@@ -42,6 +50,10 @@ class KomodoStack:
         self.id = stack_id
         self.name = f"Unknown Stack {stack_id}"
         self.server_id = "unknown"
+        self.repo_link = None
+        self.git_provider = None
+        self.repo = None
+        self.branch = None
         self.services = {}
         self.alerts = []
         return self
