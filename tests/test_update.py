@@ -82,3 +82,42 @@ def test_update_entity_up_to_date():
     assert entity.installed_version == "7.4.12"
     assert entity.latest_version == "7.4.12"
     assert entity.has_update is False
+
+
+def test_update_entity_release_notes_fallback():
+    coord = _coordinator()
+    stack = MagicMock()
+    stack.id = "s1"
+    stack.name = "jarvis"
+    stack.info.server_id = "srv1"
+    svc_item = StackServiceWithUpdate(
+        service="tailscale",
+        image="tailscale/tailscale:latest",
+        latest_image="tailscale/tailscale:latest",
+        update_available=True,
+    )
+    stack.info.services = [svc_item]
+    coord.data.add_stacks([stack])
+
+    svc = coord.data.stacks["s1"].services["tailscale"]
+    svc.labels = {"org.opencontainers.image.version": "1.78.0"}
+    up_info = KomodoUpdateInfo(updated_at=100.0, current_version="1.78.0", new_version="1.80.0")
+    up_info.release_url = "https://hub.docker.com/r/tailscale/tailscale/tags"
+    svc.update_info = up_info
+
+    entity = KomodoUpdateEntity(
+        coordinator=coord,
+        item_id="entry_s1_tailscale",
+        stack_id="s1",
+        stack_name="jarvis",
+        service_name="tailscale",
+        device_info=MagicMock(),
+    )
+
+    assert entity.has_update is True
+    assert entity.release_url == "https://hub.docker.com/r/tailscale/tailscale/tags"
+    notes = entity.release_notes()
+    assert notes is not None
+    assert "Update available for tailscale" in notes
+    assert "[View Changelog / Release Notes](https://hub.docker.com/r/tailscale/tailscale/tags)" in notes
+

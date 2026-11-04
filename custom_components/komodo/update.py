@@ -92,8 +92,23 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
     def release_notes(self) -> str | None:
         """Return full release notes markdown for the pending update."""
         service = self._find_service()
-        if service and service.update_info:
+        if not service:
+            return None
+        if service.update_info and service.update_info.release_notes:
             return service.update_info.release_notes
+
+        # Dynamic fallback note with changelog / release link
+        rel_url = self.release_url
+        if rel_url:
+            lines = [
+                f"### Update available for {self._service_name}",
+                f"- **Current version**: {self.installed_version}",
+                f"- **Latest version**: {self.latest_version}",
+                "",
+                f"[View Changelog / Release Notes]({rel_url})",
+            ]
+            return "\n".join(lines)
+
         return None
 
     async def async_install(

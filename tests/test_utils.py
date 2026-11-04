@@ -2,12 +2,14 @@ import pytest
 
 from custom_components.komodo.utils import (
     clean_image_name,
+    derive_changelog_url,
     extract_version_from_env,
     extract_version_from_image_tag,
     extract_version_from_labels,
     fix_host,
     parse_docker_percent,
     parse_docker_size,
+    parse_vcs_url,
     split_docker_pair,
 )
 
@@ -118,4 +120,37 @@ def test_extract_version_from_image_tag():
     assert extract_version_from_image_tag("ghcr.io/org/repo:latest") is None
     assert extract_version_from_image_tag("ghcr.io/org/repo:stable") is None
     assert extract_version_from_image_tag("sha256:e39da29cc49bd85cabdc2fcb223e8d565048cf47cf4af042022d15510badcacd") is None
+
+
+def test_parse_vcs_url():
+    assert parse_vcs_url("https://github.com/astral-sh/uv.git") == "https://github.com/astral-sh/uv"
+    assert parse_vcs_url("https://github.com/docker-library/docker.git#3e782bb:29/dind") == "https://github.com/docker-library/docker"
+    assert parse_vcs_url("git@github.com:owner/repo.git") == "https://github.com/owner/repo"
+    assert parse_vcs_url("https://gitlab.com/group/project.git") == "https://gitlab.com/group/project"
+    assert parse_vcs_url(None) is None
+
+
+def test_derive_changelog_url():
+    # 1. From OCI source label with GitHub
+    labels_gh = {"org.opencontainers.image.source": "https://github.com/owner/my-app.git"}
+    assert derive_changelog_url("my-app:latest", labels=labels_gh, version="1.2.3") == "https://github.com/owner/my-app/releases/tag/v1.2.3"
+    assert derive_changelog_url("my-app:latest", labels=labels_gh) == "https://github.com/owner/my-app/releases"
+
+    # 2. From Komodo stack repo_link
+    assert derive_changelog_url("my-app:latest", stack_repo_link="https://github.com/fabian/stack-repo") == "https://github.com/fabian/stack-repo/releases"
+
+    # 3. From ghcr image reference
+    assert derive_changelog_url("ghcr.io/faserf/hermes-agent-hub:latest") == "https://github.com/faserf/hermes-agent-hub/releases"
+
+    # 4. From official Docker Hub image reference
+    assert derive_changelog_url("redis:alpine") == "https://hub.docker.com/_/redis/tags"
+    assert derive_changelog_url("docker:29-dind") == "https://hub.docker.com/_/docker/tags"
+
+    # 5. From Docker Hub community image reference
+    assert derive_changelog_url("tailscale/tailscale:latest") == "https://hub.docker.com/r/tailscale/tailscale/tags"
+
+    # 6. From direct documentation / changelog label
+    labels_doc = {"org.opencontainers.image.documentation": "https://docs.myproject.org/changelog"}
+    assert derive_changelog_url("myproject:1.0", labels=labels_doc) == "https://docs.myproject.org/changelog"
+
 

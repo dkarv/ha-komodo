@@ -17,6 +17,7 @@ from ..utils import (
     extract_version_from_labels,
     extract_version_from_env,
     extract_version_from_image_tag,
+    derive_changelog_url,
 )
 
 
@@ -81,15 +82,23 @@ class KomodoUpdateInfo:
         if self.release_url is None and check.latest_info:
             self.release_url = check.latest_info.release_notes_url()
 
-    def apply_registry_labels(self, labels: dict[str, str]) -> None:
-        """Extract the latest version from fetched registry labels for floating tags."""
+    def apply_registry_labels(
+        self,
+        labels: dict[str, str],
+        image: str | None = None,
+        stack_repo_link: str | None = None,
+    ) -> None:
+        """Extract latest version and changelog URL from fetched registry labels."""
         version = extract_version_from_labels(labels)
         if version and self.new_version in ("update available", "0", None):
             self.new_version = version
         if not self.release_url:
-            url = labels.get("org.opencontainers.image.url") or labels.get("org.opencontainers.image.source")
-            if url:
-                self.release_url = url
+            self.release_url = derive_changelog_url(
+                image=image,
+                labels=labels,
+                stack_repo_link=stack_repo_link,
+                version=self.new_version or version,
+            )
 
 
 class KomodoService:

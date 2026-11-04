@@ -26,6 +26,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .data.komodo_data import KomodoData
 from .data.service import KomodoService, KomodoUpdateInfo
+from .utils import derive_changelog_url
 
 _LOGGER = logging.getLogger(__name__)
 _RELEASEPROBE_LOGGER = _LOGGER.getChild("releaseprobe")
@@ -163,9 +164,27 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         update_info.apply_env(env, service_name=service.name)
         self.async_update_listeners()
 
+        stack = self.data.stacks.get(stack_id) if self.data else None
+        stack_repo_link = getattr(stack, "repo_link", None) if stack else None
+
         effective_img = service.effective_image
         if effective_img and not effective_img.startswith("sha256:"):
-            await self._probe_release_info(update_info, effective_img, labels, digests=service.image_digests)
+            await self._probe_release_info(
+                update_info,
+                effective_img,
+                labels,
+                digests=service.image_digests,
+                stack_repo_link=stack_repo_link,
+            )
+
+        # Fallback for release_url: dynamically derive changelog URL if not found by releaseprobe
+        if not update_info.release_url:
+            update_info.release_url = derive_changelog_url(
+                image=effective_img or service.image,
+                labels=labels,
+                stack_repo_link=stack_repo_link,
+                version=update_info.new_version or update_info.current_version,
+            )
 
         # Ensure installed_version is never "0" if we know the container's version/tag
         if not update_info.current_version or update_info.current_version == "0":
@@ -220,6 +239,7 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         image: str,
         labels: dict[str, str],
         digests: list[str] | None = None,
+        stack_repo_link: str | None = None,
     ) -> None:
         """Query releaseprobe for the real new version and release notes."""
         if not image or image.startswith("sha256:"):
@@ -251,13 +271,17 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
 
         # If latest_version is still unset or "update available" (e.g. tag updated in-place on Docker Hub),
         # probe registry labels directly for the configured tag
-        if update_info.new_version in ("update available", "0", None):
+        if update_info.new_version in ("update available", "0", None) or not update_info.release_url:
             try:
                 ref = parse(image)
                 reg_labels = await self.hass.async_add_executor_job(
                     partial(fetch_labels, ref, logger=_RELEASEPROBE_LOGGER)
                 )
                 if reg_labels:
-                    update_info.apply_registry_labels(reg_labels)
+                    update_info.apply_registry_labels(
+                        reg_labels,
+                        image=image,
+                        stack_repo_link=stack_repo_link,
+                    )
             except Exception as e:
                 _LOGGER.debug("Failed to fetch registry labels for %s: %s", image, e)
