@@ -28,6 +28,13 @@ except ImportError:
                 cls = type(name, (BaseMockEntity,), {})
                 setattr(self, name, cls)
                 return cls
+            if name == "DeviceInfo":
+                class DeviceInfo(dict):
+                    def __init__(self, **kwargs):
+                        super().__init__(**kwargs)
+                        self.__dict__.update(kwargs)
+                setattr(self, name, DeviceInfo)
+                return DeviceInfo
             val = MagicMock()
             setattr(self, name, val)
             return val

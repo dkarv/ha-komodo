@@ -2,6 +2,7 @@ import pytest
 
 from custom_components.komodo.utils import (
     clean_image_name,
+    create_stack_device_info,
     derive_changelog_url,
     extract_version_from_env,
     extract_version_from_image_tag,
@@ -152,5 +153,22 @@ def test_derive_changelog_url():
     # 6. From direct documentation / changelog label
     labels_doc = {"org.opencontainers.image.documentation": "https://docs.myproject.org/changelog"}
     assert derive_changelog_url("myproject:1.0", labels=labels_doc) == "https://docs.myproject.org/changelog"
+
+
+def test_create_stack_device_info_configuration_url():
+    from unittest.mock import MagicMock
+    stack = MagicMock()
+    stack.id = "s1"
+    stack.name = "jarvis"
+    stack.server_id = "srv1"
+
+    # With base_url
+    info = create_stack_device_info(stack, {"srv1": "dev_srv1"}, base_url="https://komodo.example.com")
+    assert info["configuration_url"] == "https://komodo.example.com/stacks/jarvis"
+
+    # Without base_url
+    info_no_url = create_stack_device_info(stack, {"srv1": "dev_srv1"})
+    assert info_no_url.get("configuration_url") is None
+
 
 

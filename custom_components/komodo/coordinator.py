@@ -45,6 +45,7 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             update_interval=timedelta(minutes=1),
         )
         self.my_api = my_api
+        self.host_url: str | None = None
         # Komodo server id -> device registry id, filled in during entry setup.
         self.server_device_ids: dict[str, str] = {}
 

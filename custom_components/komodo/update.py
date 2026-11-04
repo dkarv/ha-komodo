@@ -140,7 +140,9 @@ def create_update_entities_for_services(
     entities: list[KomodoUpdateEntity] = []
 
     for stack in coordinator.data.stacks.values():
-        device_info = create_stack_device_info(stack, coordinator.server_device_ids)
+        device_info = create_stack_device_info(
+            stack, coordinator.server_device_ids, base_url=coordinator.host_url
+        )
 
         for service in stack.services.values():
             entity = KomodoUpdateEntity(
