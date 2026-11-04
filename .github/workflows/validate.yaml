@@ -8,10 +8,10 @@ on:
 
 jobs:
   hacs:
-    name: hacs validate
+    name: marketplace validate
     runs-on: "ubuntu-latest"
     steps:
-      - name: HACS Action
+      - name: Marketplace Action
         uses: "hacs/action@main"
         with:
           category: "integration"
