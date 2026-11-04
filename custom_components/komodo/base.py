@@ -24,9 +24,11 @@ class KomodoBase:
         await self.api.close()
 
     async def test_connection(self) -> None:
-        """Test the connection to the API."""
+        """Test the connection to the API and record Komodo version."""
 
         try:
-            await self.api.read.getVersion(GetVersion())
+            version_res = await self.api.read.getVersion(GetVersion())
+            if version_res and hasattr(version_res, "version"):
+                self.coordinator.komodo_version = version_res.version
         except Exception as e:
             raise ConnectionError(f"Failed to connect to Komodo API: {e}") from e
