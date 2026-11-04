@@ -1,30 +1,27 @@
-from homeassistant.components.button import ButtonEntity
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+import logging
 
-from komodo_api.types import (
-    RunProcedure,
-    RunAction,
-    DeployStack,
-    RunBuild,
-)
+from homeassistant.components.button import ButtonEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from komodo_api.lib import KomodoClient
+from komodo_api.types import (
+    DeployStack,
+    RunAction,
+    RunBuild,
+    RunProcedure,
+)
 
 from custom_components.komodo.base import KomodoBase
 from custom_components.komodo.const import DOMAIN
 from custom_components.komodo.coordinator import KomodoCoordinator
 from custom_components.komodo.utils import (
-    wait_for_completion,
+    create_komodo_main_device_info,
     create_stack_device_info,
-    create_build_device_info,
-    create_procedure_device_info,
-    create_action_device_info,
+    wait_for_completion,
 )
-
-import logging
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -262,8 +259,9 @@ def create_build_buttons(
     if not coordinator.data or not coordinator.data.builds:
         return entities
 
+    device_info = create_komodo_main_device_info(entry_id, coordinator)
+
     for build in coordinator.data.builds.values():
-        device_info = create_build_device_info(build, base_url=coordinator.host_url)
         entity = KomodoBuildRunButton(
             coordinator=coordinator,
             api=api,
@@ -287,10 +285,9 @@ def create_procedure_buttons(
     if not coordinator.data or not coordinator.data.procedures:
         return entities
 
+    device_info = create_komodo_main_device_info(entry_id, coordinator)
+
     for procedure in coordinator.data.procedures.values():
-        device_info = create_procedure_device_info(
-            procedure, base_url=coordinator.host_url
-        )
         entity = KomodoProcedureButton(
             coordinator=coordinator,
             api=api,
@@ -314,8 +311,9 @@ def create_action_buttons(
     if not coordinator.data or not coordinator.data.actions:
         return entities
 
+    device_info = create_komodo_main_device_info(entry_id, coordinator)
+
     for action in coordinator.data.actions.values():
-        device_info = create_action_device_info(action, base_url=coordinator.host_url)
         entity = KomodoActionButton(
             coordinator=coordinator,
             api=api,

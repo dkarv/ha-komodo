@@ -1,18 +1,21 @@
+import asyncio
 import ipaddress
 import re
-import asyncio
-from komodo_api.lib import KomodoClient
-from komodo_api.types import Update, UpdateStatus, GetUpdate
 from typing import TYPE_CHECKING
+
 from homeassistant.const import MAJOR_VERSION, MINOR_VERSION
 from homeassistant.helpers.device_registry import DeviceInfo
+from komodo_api.lib import KomodoClient
+from komodo_api.types import GetUpdate, Update, UpdateStatus
+
 from .const import DOMAIN
 
 if TYPE_CHECKING:
-    from .data.stack import KomodoStack
+    from .coordinator import KomodoCoordinator
+    from .data.action import KomodoAction
     from .data.build import KomodoBuild
     from .data.procedure import KomodoProcedure
-    from .data.action import KomodoAction
+    from .data.stack import KomodoStack
 
 import logging
 
@@ -22,17 +25,38 @@ _LOGGER = logging.getLogger(__name__)
 _SUPPORTS_VIA_DEVICE_ID = (MAJOR_VERSION, MINOR_VERSION) >= (2026, 8)
 
 
+def create_komodo_main_device_info(
+    entry_id: str,
+    coordinator: "KomodoCoordinator",
+) -> DeviceInfo:
+    """Create device info for the central Komodo Core device."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, entry_id)},
+        name="Komodo",
+        manufacturer="Komodo",
+        model="Fleet Controller",
+        sw_version=coordinator.komodo_version,
+        configuration_url=coordinator.host_url,
+    )
+
+
 def create_stack_device_info(
     stack: "KomodoStack",
     server_device_ids: dict[str, str],
     base_url: str | None = None,
 ) -> DeviceInfo:
     """Create device info for a stack, linked to the device of its server."""
-    config_url = f"{base_url.rstrip('/')}/stacks/{stack.name}" if base_url else None
+    config_url = f"{base_url.rstrip('/')}/stacks/{stack.id}" if base_url else None
     sw_ver = None
     if stack.deployed_hash:
         sw_ver = stack.deployed_hash[:8]
-    elif stack.branch:
+    elif stack.branch and stack.branch.lower() not in (
+        "main",
+        "master",
+        "head",
+        "trunk",
+        "default",
+    ):
         sw_ver = stack.branch
     device_info = DeviceInfo(
         identifiers={(DOMAIN, stack.id)},
@@ -56,9 +80,15 @@ def create_build_device_info(
     base_url: str | None = None,
 ) -> DeviceInfo:
     """Create device info for a build pipeline."""
-    config_url = f"{base_url.rstrip('/')}/builds/{build.name}" if base_url else None
+    config_url = f"{base_url.rstrip('/')}/builds/{build.id}" if base_url else None
     sw_ver = None
-    if build.version:
+    if build.version and build.version.lower() not in (
+        "main",
+        "master",
+        "head",
+        "trunk",
+        "default",
+    ):
         sw_ver = build.version
     elif build.built_hash:
         sw_ver = build.built_hash[:8]
@@ -77,7 +107,7 @@ def create_procedure_device_info(
     base_url: str | None = None,
 ) -> DeviceInfo:
     """Create device info for a procedure."""
-    config_url = f"{base_url.rstrip('/')}/procedures/{procedure.name}" if base_url else None
+    config_url = f"{base_url.rstrip('/')}/procedures/{procedure.id}" if base_url else None
     return DeviceInfo(
         identifiers={(DOMAIN, f"procedure_{procedure.id}")},
         name=f"Procedure {procedure.name}",
@@ -92,7 +122,7 @@ def create_action_device_info(
     base_url: str | None = None,
 ) -> DeviceInfo:
     """Create device info for an action."""
-    config_url = f"{base_url.rstrip('/')}/actions/{action.name}" if base_url else None
+    config_url = f"{base_url.rstrip('/')}/actions/{action.id}" if base_url else None
     return DeviceInfo(
         identifiers={(DOMAIN, f"action_{action.id}")},
         name=f"Action {action.name}",
@@ -119,7 +149,7 @@ def fix_host(host: str) -> str:
 
 
 async def wait_for_completion(client: KomodoClient, update: Update, title: str):
-    while not update.status == UpdateStatus.COMPLETE:
+    while update.status != UpdateStatus.COMPLETE:
         await asyncio.sleep(1)
         update = await client.read.getUpdate(GetUpdate(id=update.id.oid))
 
