@@ -15,6 +15,9 @@ class KomodoStack:
     id: str
     name: str
     server_id: str | None
+    branch: str | None
+    deployed_hash: str | None
+    latest_hash: str | None
     services: dict[str, KomodoService]
     alerts: List[str]
 
@@ -24,6 +27,9 @@ class KomodoStack:
         self.name = item.name
         # Komodo reports an empty server_id for stacks not assigned to a server.
         self.server_id = item.info.server_id or None
+        self.branch = getattr(item.info, "branch", None)
+        self.deployed_hash = getattr(item.info, "deployed_hash", None)
+        self.latest_hash = getattr(item.info, "latest_hash", None)
         self.services = {}
         self.alerts = []
 
@@ -43,6 +49,9 @@ class KomodoStack:
         self.id = stack_id
         self.name = f"Unknown Stack {stack_id}"
         self.server_id = None
+        self.branch = None
+        self.deployed_hash = None
+        self.latest_hash = None
         self.services = {}
         self.alerts = []
         return self
