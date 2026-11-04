@@ -11,11 +11,13 @@ from komodo_api.lib import KomodoClient
 from komodo_api.types import (
     InspectImage,
     InspectStackContainer,
-    ListServers,
-    ListStacks,
+    ListActions,
     ListAlerts,
     ListAllStackServices,
     ListBuilds,
+    ListProcedures,
+    ListServers,
+    ListStacks,
 )
 
 from releaseprobe import (
@@ -86,6 +88,9 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 self.my_api.read.listAllStackServices(ListAllStackServices(limit=0)),
                 # Builds (CI/CD pipelines)
                 self.my_api.read.listBuilds(ListBuilds(limit=0)),
+                # Procedures & Actions (Runbooks & Automations)
+                self.my_api.read.listProcedures(ListProcedures(limit=0)),
+                self.my_api.read.listActions(ListActions(limit=0)),
             ]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
             _LOGGER.debug("Server response: %s", responses[0])
@@ -93,6 +98,8 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             _LOGGER.debug("Alert response: %s", responses[2])
             _LOGGER.debug("Stack services response: %s", responses[3])
             _LOGGER.debug("Build response: %s", responses[4])
+            _LOGGER.debug("Procedure response: %s", responses[5])
+            _LOGGER.debug("Action response: %s", responses[6])
             data = KomodoData()
 
             # Servers
@@ -125,6 +132,18 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 _LOGGER.error("Error fetching builds", exc_info=responses[4])
             else:
                 data.add_builds(responses[4])
+
+            # Procedures
+            if isinstance(responses[5], Exception):
+                _LOGGER.error("Error fetching procedures", exc_info=responses[5])
+            else:
+                data.add_procedures(responses[5])
+
+            # Actions
+            if isinstance(responses[6], Exception):
+                _LOGGER.error("Error fetching actions", exc_info=responses[6])
+            else:
+                data.add_actions(responses[6])
 
         self._compute_update_info(data)
         return data

@@ -11,6 +11,7 @@ from .const import DOMAIN
 if TYPE_CHECKING:
     from .data.stack import KomodoStack
     from .data.build import KomodoBuild
+    from .data.automation import KomodoAction, KomodoProcedure
 
 import logging
 
@@ -76,6 +77,36 @@ def create_build_device_info(
         base_url,
         sw_version=build.version or (build.built_hash[:8] if build.built_hash else None),
         model="Build",
+    )
+
+
+def create_procedure_device_info(
+    procedure: "KomodoProcedure",
+    base_url: str | None = None,
+) -> DeviceInfo:
+    """Create device info for a procedure."""
+    return _resource_device_info(
+        procedure.id,
+        f"Procedure {procedure.name}",
+        f"procedures/{procedure.name}",
+        base_url,
+        sw_version=None,
+        model="Procedure",
+    )
+
+
+def create_action_device_info(
+    action: "KomodoAction",
+    base_url: str | None = None,
+) -> DeviceInfo:
+    """Create device info for an action."""
+    return _resource_device_info(
+        action.id,
+        f"Action {action.name}",
+        f"actions/{action.name}",
+        base_url,
+        sw_version=None,
+        model="Action",
     )
 
 
