@@ -14,12 +14,17 @@ def create_server_sensors(
 ) -> list[KomodoSensor]:
     """Return a list of sensors, one device per server."""
     sensors: list[KomodoSensor] = []
+    base_url = coordinator.host_url
     for server in coordinator.data.servers.values():
+        if not server.id or server.is_unknown:
+            continue
+        config_url = f"{base_url.rstrip('/')}/servers/{server.name}" if base_url else None
         device_info = DeviceInfo(
             identifiers={(DOMAIN, server.id)},
             name=server.name,
             manufacturer="Komodo",
             sw_version=server.periphery_version,
+            configuration_url=config_url,
         )
 
         item_id = f"{entry_id}_{server.id}"
