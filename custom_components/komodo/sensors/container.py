@@ -44,7 +44,9 @@ def create_container_sensors(
     """
     sensors: list[KomodoSensor] = []
     for stack in coordinator.data.stacks.values():
-        device_info = create_stack_device_info(stack, coordinator.server_device_ids)
+        device_info = create_stack_device_info(
+            stack, coordinator.server_device_ids, base_url=coordinator.host_url
+        )
 
         for service in stack.services.values():
             item_id = f"{entry_id}_{stack.id}_{service.name}"

@@ -13,7 +13,9 @@ def create_stack_sensors(
     """
     sensors: list[KomodoSensor] = []
     for stack in coordinator.data.stacks.values():
-        device_info = create_stack_device_info(stack, coordinator.server_device_ids)
+        device_info = create_stack_device_info(
+            stack, coordinator.server_device_ids, base_url=coordinator.host_url
+        )
 
         item_id = f"{entry_id}_{stack.id}"
 
