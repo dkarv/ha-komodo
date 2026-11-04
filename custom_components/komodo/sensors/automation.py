@@ -1,10 +1,11 @@
 from typing import Any
+
 from homeassistant.helpers.device_registry import DeviceInfo
-from komodo_api.types import ProcedureState, ActionState
+from komodo_api.types import ActionState, ProcedureState
 
 from ..coordinator import KomodoCoordinator
 from ..data.komodo_data import KomodoData
-from ..utils import create_procedure_device_info, create_action_device_info
+from ..utils import create_komodo_main_device_info
 from .common import KomodoOptionSensor, KomodoSensor
 
 
@@ -106,10 +107,9 @@ def create_automation_sensors(
     if not coordinator.data:
         return sensors
 
+    device_info = create_komodo_main_device_info(entry_id, coordinator)
+
     for proc in coordinator.data.procedures.values():
-        device_info = create_procedure_device_info(
-            proc, base_url=coordinator.host_url
-        )
         item_id = f"{entry_id}_procedure_{proc.id}"
         sensors.append(
             KomodoProcedureStateSensor(
@@ -121,9 +121,6 @@ def create_automation_sensors(
         )
 
     for act in coordinator.data.actions.values():
-        device_info = create_action_device_info(
-            act, base_url=coordinator.host_url
-        )
         item_id = f"{entry_id}_action_{act.id}"
         sensors.append(
             KomodoActionStateSensor(

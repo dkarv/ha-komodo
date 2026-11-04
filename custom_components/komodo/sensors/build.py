@@ -1,10 +1,11 @@
 from typing import Any
+
 from homeassistant.helpers.device_registry import DeviceInfo
 from komodo_api.types import BuildState
 
 from ..coordinator import KomodoCoordinator
 from ..data.komodo_data import KomodoData
-from ..utils import create_build_device_info
+from ..utils import create_komodo_main_device_info
 from .common import KomodoOptionSensor, KomodoSensor
 
 
@@ -65,8 +66,8 @@ def create_build_sensors(
     if not coordinator.data or not coordinator.data.builds:
         return sensors
 
+    device_info = create_komodo_main_device_info(entry_id, coordinator)
     for build in coordinator.data.builds.values():
-        device_info = create_build_device_info(build, base_url=coordinator.host_url)
         item_id = f"{entry_id}_build_{build.id}"
 
         sensors.append(

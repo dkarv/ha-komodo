@@ -147,7 +147,11 @@ def test_unassigned_stack_does_not_create_unknown_server_device():
 
 def test_add_builds_and_sensor():
     from komodo_api.types import BuildState
-    from custom_components.komodo.sensors.build import KomodoBuildStateSensor, create_build_sensors
+
+    from custom_components.komodo.sensors.build import (
+        KomodoBuildStateSensor,
+        create_build_sensors,
+    )
 
     data = KomodoData()
     mock_build = MagicMock()
@@ -183,13 +187,16 @@ def test_add_builds_and_sensor():
     assert attrs["version"] == "1.0.0"
     assert attrs["built_hash"] == "abc12345"
     assert attrs["repo"] == "FaserF/Jarvis"
+    from custom_components.komodo.const import DOMAIN
+    assert sensor._attr_device_info["identifiers"] == {(DOMAIN, "entry_1")}
 
 
 def test_add_procedures_and_actions():
-    from komodo_api.types import ProcedureState, ActionState
+    from komodo_api.types import ActionState, ProcedureState
+
     from custom_components.komodo.sensors.automation import (
-        KomodoProcedureStateSensor,
         KomodoActionStateSensor,
+        KomodoProcedureStateSensor,
         create_automation_sensors,
     )
 
@@ -225,13 +232,16 @@ def test_add_procedures_and_actions():
     sensors = create_automation_sensors(coordinator, "entry_1")
     assert len(sensors) == 2
 
-    proc_sensor = [s for s in sensors if isinstance(s, KomodoProcedureStateSensor)][0]
+    proc_sensor = next(s for s in sensors if isinstance(s, KomodoProcedureStateSensor))
     assert proc_sensor._attr_entity_registry_enabled_default is False
     assert proc_sensor.native_value == "OK"
     assert proc_sensor.extra_state_attributes["stages"] == 3
 
-    act_sensor = [s for s in sensors if isinstance(s, KomodoActionStateSensor)][0]
+    act_sensor = next(s for s in sensors if isinstance(s, KomodoActionStateSensor))
     assert act_sensor._attr_entity_registry_enabled_default is False
     assert act_sensor.native_value == "OK"
+    from custom_components.komodo.const import DOMAIN
+    assert proc_sensor._attr_device_info["identifiers"] == {(DOMAIN, "entry_1")}
+    assert act_sensor._attr_device_info["identifiers"] == {(DOMAIN, "entry_1")}
 
 

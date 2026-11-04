@@ -166,17 +166,55 @@ def test_create_stack_device_info_configuration_url():
 
     # With base_url and deployed_hash
     info = create_stack_device_info(stack, {"srv1": "dev_srv1"}, base_url="https://komodo.example.com")
-    assert info["configuration_url"] == "https://komodo.example.com/stacks/jarvis"
+    assert info["configuration_url"] == "https://komodo.example.com/stacks/s1"
     assert info["sw_version"] == "641203c1"
 
-    # Without deployed_hash, falls back to branch
+    # Without deployed_hash and branch="main", sw_version should be None (no "Firmware: main")
     stack.deployed_hash = None
-    info_branch = create_stack_device_info(stack, {"srv1": "dev_srv1"})
-    assert info_branch["sw_version"] == "main"
+    info_branch_main = create_stack_device_info(stack, {"srv1": "dev_srv1"})
+    assert info_branch_main["sw_version"] is None
+
+    # With a custom non-default branch, sw_version should be the branch
+    stack.branch = "feature/awesome"
+    info_branch_custom = create_stack_device_info(stack, {"srv1": "dev_srv1"})
+    assert info_branch_custom["sw_version"] == "feature/awesome"
 
     # Without base_url
     info_no_url = create_stack_device_info(stack, {"srv1": "dev_srv1"})
     assert info_no_url.get("configuration_url") is None
+
+
+def test_create_komodo_main_device_info():
+    from unittest.mock import MagicMock
+
+    from custom_components.komodo.const import DOMAIN
+    from custom_components.komodo.utils import create_komodo_main_device_info
+
+    coordinator = MagicMock()
+    coordinator.komodo_version = "2.3.3"
+    coordinator.host_url = "https://komodo.example.com"
+
+    info = create_komodo_main_device_info("entry_123", coordinator)
+    assert info["identifiers"] == {(DOMAIN, "entry_123")}
+    assert info["name"] == "Komodo"
+    assert info["manufacturer"] == "Komodo"
+    assert info["model"] == "Fleet Controller"
+    assert info["sw_version"] == "2.3.3"
+    assert info["configuration_url"] == "https://komodo.example.com"
+
+
+def test_derive_changelog_url_advanced():
+    # Suffixes like (update available)
+    labels = {"org.opencontainers.image.source": "https://github.com/owner/my-app"}
+    assert derive_changelog_url("app", labels=labels, version="1.2.3 (update available)") == "https://github.com/owner/my-app/releases/tag/v1.2.3"
+
+    # Git commit hash
+    assert derive_changelog_url("app", labels=labels, version="eacaaad") == "https://github.com/owner/my-app/commit/eacaaad"
+
+    # Generic or empty version
+    assert derive_changelog_url("app", labels=labels, version="update available") == "https://github.com/owner/my-app/releases"
+    assert derive_changelog_url("app", labels=labels, version="main") == "https://github.com/owner/my-app/releases"
+
 
 
 

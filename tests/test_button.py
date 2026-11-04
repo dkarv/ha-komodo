@@ -1,8 +1,10 @@
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-import custom_components.komodo.button as button
+import pytest
+
+from custom_components.komodo import button
+
 
 @pytest.fixture
 def mock_komodo_api():
@@ -126,3 +128,44 @@ def test_build_run_button(monkeypatch, mock_komodo_api):
     )
     assert called['name'] == "Run build jarvis-hub"
     coordinator.async_request_refresh.assert_awaited_once()
+
+
+def test_automation_buttons_use_main_device(mock_komodo_api):
+    from custom_components.komodo.const import DOMAIN
+    from custom_components.komodo.data.komodo_data import KomodoData
+
+    data = KomodoData()
+    mock_proc = MagicMock()
+    mock_proc.id = "p1"
+    mock_proc.name = "backup"
+    mock_proc.info.state = MagicMock()
+    mock_act = MagicMock()
+    mock_act.id = "a1"
+    mock_act.name = "prune"
+    mock_act.info.state = MagicMock()
+    mock_bld = MagicMock()
+    mock_bld.id = "b1"
+    mock_bld.name = "builder"
+    mock_bld.info.state = MagicMock()
+
+    data.add_procedures([mock_proc])
+    data.add_actions([mock_act])
+    data.add_builds([mock_bld])
+
+    coordinator = MagicMock()
+    coordinator.data = data
+    coordinator.host_url = "https://komodo.example.com"
+    coordinator.komodo_version = "2.3.3"
+
+    proc_btns = button.create_procedure_buttons(coordinator, mock_komodo_api, "entry_1")
+    assert len(proc_btns) == 1
+    assert proc_btns[0]._attr_device_info["identifiers"] == {(DOMAIN, "entry_1")}
+
+    act_btns = button.create_action_buttons(coordinator, mock_komodo_api, "entry_1")
+    assert len(act_btns) == 1
+    assert act_btns[0]._attr_device_info["identifiers"] == {(DOMAIN, "entry_1")}
+
+    bld_btns = button.create_build_buttons(coordinator, mock_komodo_api, "entry_1")
+    assert len(bld_btns) == 1
+    assert bld_btns[0]._attr_device_info["identifiers"] == {(DOMAIN, "entry_1")}
+

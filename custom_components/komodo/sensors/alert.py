@@ -1,7 +1,6 @@
 from ..coordinator import KomodoCoordinator
+from ..utils import create_komodo_main_device_info
 from .common import KomodoSensor
-from homeassistant.helpers.device_registry import DeviceInfo
-from ..const import DOMAIN
 
 
 def create_alert_sensors(
@@ -20,14 +19,7 @@ def create_alert_sensors(
             return ", ".join(data.alert_list)
         return ""
 
-    base_url = coordinator.host_url
-    device_info = DeviceInfo(
-        identifiers={(DOMAIN, f"{entry_id}_global")},
-        name="Komodo Alerts",
-        manufacturer="Komodo",
-        sw_version=coordinator.komodo_version,
-        configuration_url=f"{base_url.rstrip('/')}/alerts" if base_url else None,
-    )
+    device_info = create_komodo_main_device_info(entry_id, coordinator)
 
     return [
         KomodoSensor(

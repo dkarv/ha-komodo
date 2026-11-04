@@ -5,6 +5,7 @@
     "@dkarv"
   ],
   "config_flow": true,
+  "changelog": "https://github.com/dkarv/ha-komodo/releases",
   "dependencies": [],
   "documentation": "https://github.com/dkarv/ha-komodo/blob/main/README.md",
   "homekit": {},
