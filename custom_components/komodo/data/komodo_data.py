@@ -18,8 +18,8 @@ from .stack import KomodoStack
 class KomodoData:
     """Wrapper to represent all data fetched from the API."""
 
-    servers: Mapping[str, KomodoServer]
-    stacks: Mapping[str, KomodoStack]
+    servers: dict[str, KomodoServer]
+    stacks: dict[str, KomodoStack]
     alert_count: Optional[int]
     alert_list: Optional[List[str]]
 
@@ -59,18 +59,21 @@ class KomodoData:
                 stack.add_service(KomodoService(service))
 
     def add_stack_services(self, services: ListAllStackServicesResponse):
-        """Attach container state/image/labels to the services from add_stacks.
+        """Attach container state/image/labels/digests to the services from add_stacks.
 
         Must run after add_stacks. Services without a container (stack down,
         server unreachable, swarm mode) keep state None.
         """
         for item in services:
             stack = self.stacks.get(item.stack_id)
-            if stack is None or item.container is None:
+            if stack is None:
                 continue
             service = stack.services.get(item.service)
             if service is not None:
-                service.apply_container(item.container)
+                if hasattr(service, "apply_stack_service"):
+                    service.apply_stack_service(item)
+                elif item.container is not None:
+                    service.apply_container(item.container)
 
     def get_stack(self, stack_id: str) -> KomodoStack:
         """Get stack by ID."""

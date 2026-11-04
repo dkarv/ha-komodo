@@ -111,3 +111,109 @@ def split_docker_pair(text: str | None) -> tuple[str | None, str | None]:
     if len(parts) != 2:
         return None, None
     return parts[0].strip(), parts[1].strip()
+
+
+def clean_image_name(img: str | None) -> str:
+    """Normalize docker image name by resolving compose variable interpolations."""
+    if not img:
+        return ""
+    # Resolve compose variable patterns like ${VAR:-default} or ${VAR}
+    def repl(match: re.Match) -> str:
+        var_name = match.group(1)
+        default_val = match.group(2)
+        if default_val is not None:
+            return default_val
+        return ""
+
+    cleaned = re.sub(r"\$\{([^}:]+)(?::-([^}]+))?\}", repl, img)
+    return cleaned.strip()
+
+
+def extract_version_from_labels(labels: dict[str, str] | None) -> str | None:
+    """Extract a software version from standard container labels."""
+    if not labels:
+        return None
+
+    # Priority 1: standard OCI / Docker version labels
+    for key in (
+        "org.opencontainers.image.version",
+        "version",
+        "image.version",
+        "org.label-schema.version",
+    ):
+        if val := labels.get(key):
+            val = val.strip()
+            if val and val != "0":
+                return val
+
+    # Priority 2: LinuxServer.io build_version format
+    if bv := labels.get("build_version"):
+        m = re.search(r"version:-\s*([^\s]+)", bv, re.IGNORECASE)
+        if m:
+            val = m.group(1).strip()
+            if val and val != "0":
+                return val
+
+    return None
+
+
+def extract_version_from_env(env: list[str] | None, service_name: str | None = None) -> str | None:
+    """Extract software version from container environment variables."""
+    if not env:
+        return None
+
+    env_dict: dict[str, str] = {}
+    for item in env:
+        if "=" in item:
+            k, v = item.split("=", 1)
+            env_dict[k.strip()] = v.strip()
+
+    norm_service = (service_name or "").upper().replace("-", "_")
+
+    # Service-specific matches (e.g. DOCKER_VERSION for dind, REDIS_VERSION for redis)
+    if norm_service in ("DIND", "DOCKER"):
+        if ver := env_dict.get("DOCKER_VERSION"):
+            return ver
+
+    exact_keys = (
+        f"{norm_service}_VERSION",
+        "APP_VERSION",
+        "APPLICATION_VERSION",
+        "VERSION",
+        "RELEASE",
+        "IMAGE_VERSION",
+    )
+    for key in exact_keys:
+        if ver := env_dict.get(key):
+            ver = ver.strip()
+            if ver and ver != "0":
+                return ver
+
+    # Fallback to any *_VERSION variable with a semver-like value
+    ignored_tools = ("BUILDX", "COMPOSE", "INIT", "CLI", "WRAPPER")
+    for k, v in env_dict.items():
+        k_upper = k.upper()
+        if k_upper.endswith("_VERSION") and not any(tool in k_upper for tool in ignored_tools):
+            v_clean = v.strip()
+            if v_clean and v_clean != "0" and re.search(r"^\d+(\.\d+)+", v_clean):
+                return v_clean
+
+    return None
+
+
+def extract_version_from_image_tag(image: str | None) -> str | None:
+    """Extract a version tag from an image reference if not a generic floating tag."""
+    if not image or image.startswith("sha256:"):
+        return None
+
+    # Strip digest if present
+    repo_and_tag = image.split("@")[0]
+    if ":" not in repo_and_tag:
+        return None
+
+    tag = repo_and_tag.split(":")[-1].strip()
+    if not tag or tag in ("latest", "stable", "nightly", "edge", "master", "main"):
+        return None
+
+    return tag
+

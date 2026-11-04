@@ -6,6 +6,7 @@ from typing import Any
 from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -27,6 +28,7 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
     _attr_supported_features = (
         UpdateEntityFeature.INSTALL | UpdateEntityFeature.RELEASE_NOTES
     )
+    _attr_title: str | None = None
 
     def __init__(
         self,
@@ -56,15 +58,30 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
             return None
         return stack.services.get(self._service_name)
 
+    @property
+    def has_update(self) -> bool:
+        """Return True if an update is available according to Komodo."""
+        service = self._find_service()
+        if not service:
+            return False
+        return bool(service.update_available)
+
     def _update_attrs(self) -> None:
         """Update entity attributes from coordinator data."""
         service = self._find_service()
         if service and service.update_info:
-            self._attr_installed_version = service.update_info.current_version
+            self._attr_installed_version = service.update_info.current_version or service.installed_version
             self._attr_latest_version = service.update_info.new_version
             self._attr_title = f"{self._service_name}: "
             self._attr_release_summary = service.update_info.release_summary
             self._attr_release_url = service.update_info.release_url
+        elif service:
+            installed = service.installed_version
+            self._attr_installed_version = installed
+            self._attr_latest_version = installed
+            self._attr_title = None
+            self._attr_release_summary = None
+            self._attr_release_url = None
         else:
             self._attr_installed_version = "0"
             self._attr_latest_version = "0"

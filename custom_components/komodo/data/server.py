@@ -87,7 +87,7 @@ class KomodoServer:
     @property
     def disk_percent(self) -> Optional[float]:
         """Return the disk usage percentage."""
-        if not self.disk_total_gb:
+        if not self.disk_total_gb or self.disk_used_gb is None:
             return None
         return self.disk_used_gb / self.disk_total_gb * 100
 

@@ -1,5 +1,6 @@
 """Coordinator to fetch the data once for all sensors."""
 
+from typing import Any
 import asyncio
 import logging
 import time
@@ -17,6 +18,8 @@ from komodo_api.types import (
 )
 
 from releaseprobe import UnknownVersionError, check_for_update
+from releaseprobe.imageref import parse
+from releaseprobe.registry import fetch_labels
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -119,13 +122,13 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 ):
                     service.update_info = previous_update_info
                 elif service.has_container:
-                    update_info = KomodoUpdateInfo(now)
+                    update_info = KomodoUpdateInfo(now, current_version=service.installed_version)
                     service.update_info = update_info
                     self._schedule_release_probe(update_info, stack_id, service)
                 else:
                     # No container (stack DOWN/UNKNOWN). Carry any cached
                     # update info forward so a pending update isn't lost while
-                    # the stack is down and reported as installed=0/latest=0.
+                    # the stack is down.
                     service.update_info = previous_update_info
 
     def _schedule_release_probe(
@@ -133,35 +136,54 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
     ) -> None:
         """Kick off the container inspect + releaseprobe lookup in the background.
 
-        The inspect is needed for the container labels (list items don't carry
-        them), and is a live periphery query. releaseprobe hits external registries and (for GitHub-hosted images) the GitHub
-        API to resolve the real new version and changelog, which can be slow
-        or rate-limited. Running it as a background task keeps it off the
-        coordinator's update cycle - and, on the first update, off config
-        entry setup - so a slow/unreachable registry can't cause a setup
-        timeout. update_info starts with placeholder values and is mutated
-        in place once the probe completes; _compute_update_info carries the
-        same object forward across refreshes (see its cache check), so the
-        update is picked up regardless of which refresh is current by the
-        time it lands.
+        The inspect is needed for container labels, environment variables,
+        and configured image tags. Running it as a background task keeps it off
+        the coordinator's update cycle.
         """
         self.hass.async_create_background_task(
-            self._async_probe_release_info(update_info, stack_id, service.name, service.image),
+            self._async_probe_release_info(update_info, stack_id, service),
             name=f"komodo_release_probe_{service.name}",
         )
 
     async def _async_probe_release_info(
-        self, update_info: KomodoUpdateInfo, stack_id: str, service_name: str, image: str
+        self, update_info: KomodoUpdateInfo, stack_id: str, service: KomodoService
     ) -> None:
         """Inspect the container, run the release probe, and notify entities."""
-        labels = await self._fetch_container_labels(stack_id, service_name)
+        info = await self._fetch_container_inspect(stack_id, service.name)
+        labels = info.get("labels", {})
+        env = info.get("env", [])
+        config_image = info.get("config_image")
+
+        service.labels = labels
+        service.env = env
+        if config_image:
+            service.config_image = config_image
+
         update_info.apply_labels(labels)
-        self.async_update_listeners()
-        await self._probe_release_info(update_info, image, labels)
+        update_info.apply_env(env, service_name=service.name)
         self.async_update_listeners()
 
-    async def _fetch_container_labels(self, stack_id: str, service_name: str) -> dict[str, str]:
-        """Get the labels of a service's container (including image labels)."""
+        effective_img = service.effective_image
+        if effective_img and not effective_img.startswith("sha256:"):
+            await self._probe_release_info(update_info, effective_img, labels, digests=service.image_digests)
+
+        # Ensure installed_version is never "0" if we know the container's version/tag
+        if not update_info.current_version or update_info.current_version == "0":
+            installed = service.installed_version
+            if installed and installed != "0":
+                update_info.current_version = installed
+
+        # If new_version is still missing or identical to current_version while an update is pending
+        if service.update_available and (not update_info.new_version or update_info.new_version == update_info.current_version):
+            if update_info.current_version and update_info.current_version != "0":
+                update_info.new_version = f"{update_info.current_version} (update available)"
+            else:
+                update_info.new_version = "update available"
+
+        self.async_update_listeners()
+
+    async def _fetch_container_inspect(self, stack_id: str, service_name: str) -> dict[str, Any]:
+        """Get the full inspect data of a service's container."""
         try:
             async with asyncio.timeout(10):
                 response = await self.my_api.read.inspectStackContainer(
@@ -177,40 +199,65 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                 "Failed to inspect service %s in stack %s: %s", service_name, stack_id, e
             )
             return {}
-        return (response.config.labels if response.config else None) or {}
+
+        config = response.config if response else None
+        return {
+            "labels": (config.labels if config else None) or {},
+            "env": (config.env if config else None) or [],
+            "config_image": (config.image if config else None) or "",
+            "image_id": getattr(response, "image", None) or "",
+            "created": getattr(response, "created", None) or "",
+        }
+
+    async def _fetch_container_labels(self, stack_id: str, service_name: str) -> dict[str, str]:
+        """Get the labels of a service's container (backwards compatibility)."""
+        info = await self._fetch_container_inspect(stack_id, service_name)
+        return info.get("labels", {})
 
     async def _probe_release_info(
-        self, update_info: KomodoUpdateInfo, image: str, labels: dict[str, str]
+        self,
+        update_info: KomodoUpdateInfo,
+        image: str,
+        labels: dict[str, str],
+        digests: list[str] | None = None,
     ) -> None:
         """Query releaseprobe for the real new version and release notes."""
-        if not image:
+        if not image or image.startswith("sha256:"):
             return
+
+        check = None
         try:
-            # Passing the container's own labels lets releaseprobe resolve
-            # the current version for floating tags (e.g. `latest`) and
-            # skips a redundant registry round-trip for pinned ones.
             check = await self.hass.async_add_executor_job(
                 partial(
                     check_for_update,
                     image,
-                    labels,
+                    current_labels=labels,
+                    current_digests=digests or None,
                     logger=_RELEASEPROBE_LOGGER,
                 )
             )
         except UnknownVersionError:
-            # Not a transient failure: the image uses a floating tag (e.g.
-            # `latest`) and doesn't label its version, so there's nothing to
-            # compare against until it's updated to an image that does.
-            _LOGGER.info(
-                "Cannot determine the installed version of %s: it uses a floating tag "
-                "and has no org.opencontainers.image.version label, so no new version "
-                "or release notes can be shown",
+            _LOGGER.debug(
+                "Cannot determine installed version of %s from tags list: image uses a floating tag",
                 image,
             )
-            return
         except Exception as e:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Failed to look up the new version and release notes for %s: %s", image, e
             )
-            return
-        update_info.apply_release_info(check)
+
+        if check:
+            update_info.apply_release_info(check)
+
+        # If latest_version is still unset or "update available" (e.g. tag updated in-place on Docker Hub),
+        # probe registry labels directly for the configured tag
+        if update_info.new_version in ("update available", "0", None):
+            try:
+                ref = parse(image)
+                reg_labels = await self.hass.async_add_executor_job(
+                    partial(fetch_labels, ref, logger=_RELEASEPROBE_LOGGER)
+                )
+                if reg_labels:
+                    update_info.apply_registry_labels(reg_labels)
+            except Exception as e:
+                _LOGGER.debug("Failed to fetch registry labels for %s: %s", image, e)
