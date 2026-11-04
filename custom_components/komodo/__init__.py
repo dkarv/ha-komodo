@@ -1,4 +1,4 @@
-"""The BWT Perla integration."""
+"""The Komodo integration."""
 
 import logging
 
@@ -19,6 +19,7 @@ from .const import (
 )
 from .base import KomodoBase
 from .sensors.container import container_sensor_category
+from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.UPDATE, Platform.BUTTON, Platform.SWITCH]
@@ -62,6 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await async_setup_services(hass)
     entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 
     return True
@@ -102,6 +104,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         komodo = hass.data[DOMAIN].pop(entry.entry_id)
         await komodo.close()
+        await async_unload_services(hass)
 
     return unload_ok
 
