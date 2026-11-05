@@ -4,7 +4,13 @@ from komodo_api.types import (
     ContainerStateStatusEnum,
     ContainerStats,
 )
-from releaseprobe import UpdateCheck
+from releaseprobe import (
+    InvalidImageReferenceError,
+    UnknownVersionError,
+    UpdateCheck,
+    probe_labels,
+    short_digest,
+)
 from releaseprobe.changelog import ReleaseNote
 
 from ..utils import parse_docker_percent, parse_docker_size, split_docker_pair
@@ -21,40 +27,91 @@ def _format_release_notes(notes: list[ReleaseNote]) -> str:
     return "\n\n---\n\n".join(sections)
 
 
+# How long a probe result is reused before releaseprobe is asked again.
+UPDATE_INFO_TTL = 7200
+# Retry delays after transient probe failures (network errors, registry rate
+# limits), doubling per consecutive failure up to UPDATE_INFO_TTL.
+FAILURE_RETRY_BASE = 300
+
+
 class KomodoUpdateInfo:
     """Update information for a service."""
 
     current_version: str
     new_version: str
     info_updated_at: float
+    refresh_after: float
+    failures: int
     release_summary: str | None
     release_url: str | None
     release_notes: str | None
 
-    def __init__(self, updated_at: float):
+    def __init__(self, updated_at: float, failures: int = 0):
         self.current_version = "0"
         self.new_version = "update available"
         self.info_updated_at = updated_at
+        self.refresh_after = UPDATE_INFO_TTL
+        # Consecutive transient failures of earlier probes, for the backoff.
+        self.failures = failures
         self.release_summary = None
         self.release_url = None
         self.release_notes = None
 
+    def is_fresh(self, now: float) -> bool:
+        """True while this info may be reused instead of probing again."""
+        return (now - self.info_updated_at) < self.refresh_after
+
     def apply_labels(self, labels: dict[str, str]) -> None:
-        """Take the current version from the container's labels."""
+        """Show the container's labeled version until the probe has checked it."""
         self.current_version = labels.get("org.opencontainers.image.version", "0")
 
     def apply_release_info(self, check: UpdateCheck) -> None:
         """Apply the result of a releaseprobe update check."""
+        self.failures = 0
+        # The version releaseprobe actually compared, not the raw label
+        # (which may be the base image's, e.g. `24.04`, or a branch name).
+        self.current_version = check.current_version
         if check.latest_version:
             self.new_version = check.latest_version
         if check.release_notes:
             latest_note = check.release_notes[-1]
             self.release_summary = latest_note.name or latest_note.version
-            self.release_notes = _format_release_notes(check.release_notes)
+            self.release_notes = _format_release_notes(check.release_notes) or None
             # Prefer the specific release page over the generic repo URL.
             self.release_url = latest_note.url
+        elif not check.latest_version:
+            # Komodo sees a newer image, but its version is the installed one:
+            # a rebuild of the same version (or revision) under the same tag.
+            self.release_summary = "New image build, no new version or release notes"
         if self.release_url is None and check.latest_info:
             self.release_url = check.latest_info.release_notes_url()
+        if self.release_url is None:
+            self.release_url = check.current_info.release_notes_url()
+
+    def apply_unknown_version(self, err: UnknownVersionError, labels: dict[str, str]) -> None:
+        """The installed version can't be determined: say so instead of guessing."""
+        current_info = err.current_info or probe_labels(labels)
+        self._apply_unknown(err.installed_version, err.reason, current_info.release_notes_url())
+
+    def apply_invalid_image(
+        self, err: InvalidImageReferenceError, labels: dict[str, str], digests: list[str]
+    ) -> None:
+        """The image reference has no tag to check (e.g. pinned by digest only)."""
+        installed = next((short for d in digests if (short := short_digest(d))), "unknown")
+        self._apply_unknown(installed, str(err), probe_labels(labels).release_notes_url())
+
+    def _apply_unknown(self, installed: str, reason: str, release_url: str | None) -> None:
+        self.failures = 0
+        self.current_version = installed
+        self.release_summary = f"Couldn't determine the installed version ({reason})"
+        self.release_url = release_url
+
+    def apply_failure(self, labels: dict[str, str], reason: str) -> None:
+        """A transient failure: show it and retry sooner than the regular TTL."""
+        self.release_summary = f"Couldn't look up the new version: {reason}"
+        self.release_url = probe_labels(labels).release_notes_url()
+        self.refresh_after = min(FAILURE_RETRY_BASE * 2**self.failures, UPDATE_INFO_TTL)
+        self.failures += 1
 
 
 class KomodoService:

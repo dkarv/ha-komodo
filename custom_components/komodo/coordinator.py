@@ -9,6 +9,7 @@ from functools import partial
 from komodo_api.exceptions import KomodoException
 from komodo_api.lib import KomodoClient
 from komodo_api.types import (
+    InspectImage,
     InspectStackContainer,
     ListServers,
     ListStacks,
@@ -16,16 +17,27 @@ from komodo_api.types import (
     ListAllStackServices,
 )
 
-from releaseprobe import UnknownVersionError, check_for_update
+from releaseprobe import (
+    InvalidImageReferenceError,
+    UnknownVersionError,
+    check_for_update,
+    repository_name,
+)
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .data.komodo_data import KomodoData
 from .data.service import KomodoService, KomodoUpdateInfo
+from .data.stack import KomodoStack
 
 _LOGGER = logging.getLogger(__name__)
 _RELEASEPROBE_LOGGER = _LOGGER.getChild("releaseprobe")
+
+# How many release probes may run at once. Each one pages through a
+# registry's tag list and possibly GitHub's releases; starting all of them at
+# once (e.g. right after setup) easily trips registry rate limits like GHCR's.
+_MAX_CONCURRENT_PROBES = 2
 
 
 class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
@@ -43,6 +55,8 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         self.my_api = my_api
         # Komodo server id -> device registry id, filled in during entry setup.
         self.server_device_ids: dict[str, str] = {}
+        self._probe_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_PROBES)
+        self._probe_repository_locks: dict[str, asyncio.Lock] = {}
 
     async def _async_update_data(self):
         """Fetch data from API endpoint.
@@ -106,6 +120,10 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
     def _compute_update_info(self, new_data: KomodoData):
         """Compute update info for services with a pending update."""
         now = time.time()
+        # Tag listings shared by this round's probes, keyed by repository:
+        # services running images of the same repository (e.g. immich-server
+        # and immich-machine-learning) list its tags only once.
+        tags_cache: dict[str, list[str]] = {}
         for stack_id, stack in new_data.stacks.items():
             previous_stack = self.data.stacks.get(stack_id) if self.data else None
             for service_id, service in stack.services.items():
@@ -113,15 +131,14 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                     continue
                 previous_service = previous_stack.services.get(service_id) if previous_stack else None
                 previous_update_info = previous_service.update_info if previous_service else None
-                if (
-                    previous_update_info
-                    and (now - previous_update_info.info_updated_at) < 7200
-                ):
+                if previous_update_info and previous_update_info.is_fresh(now):
                     service.update_info = previous_update_info
                 elif service.has_container:
-                    update_info = KomodoUpdateInfo(now)
+                    update_info = KomodoUpdateInfo(
+                        now, previous_update_info.failures if previous_update_info else 0
+                    )
                     service.update_info = update_info
-                    self._schedule_release_probe(update_info, stack_id, service)
+                    self._schedule_release_probe(update_info, stack, service, tags_cache)
                 else:
                     # No container (stack DOWN/UNKNOWN). Carry any cached
                     # update info forward so a pending update isn't lost while
@@ -129,7 +146,11 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
                     service.update_info = previous_update_info
 
     def _schedule_release_probe(
-        self, update_info: KomodoUpdateInfo, stack_id: str, service: KomodoService
+        self,
+        update_info: KomodoUpdateInfo,
+        stack: KomodoStack,
+        service: KomodoService,
+        tags_cache: dict[str, list[str]],
     ) -> None:
         """Kick off the container inspect + releaseprobe lookup in the background.
 
@@ -146,22 +167,39 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         time it lands.
         """
         self.hass.async_create_background_task(
-            self._async_probe_release_info(update_info, stack_id, service.name, service.image),
+            self._async_probe_release_info(
+                update_info, stack.id, stack.server_id, service.name, service.image, tags_cache
+            ),
             name=f"komodo_release_probe_{service.name}",
         )
 
     async def _async_probe_release_info(
-        self, update_info: KomodoUpdateInfo, stack_id: str, service_name: str, image: str
+        self,
+        update_info: KomodoUpdateInfo,
+        stack_id: str,
+        server_id: str,
+        service_name: str,
+        image: str,
+        tags_cache: dict[str, list[str]],
     ) -> None:
         """Inspect the container, run the release probe, and notify entities."""
-        labels = await self._fetch_container_labels(stack_id, service_name)
+        labels, image_id = await self._inspect_container(stack_id, service_name)
         update_info.apply_labels(labels)
         self.async_update_listeners()
-        await self._probe_release_info(update_info, image, labels)
+        digests = await self._fetch_repo_digests(server_id, image_id) if image_id else []
+        # Probes of the same repository run one after the other, so the
+        # second one finds the tag listing of the first in tags_cache.
+        repository_lock = self._probe_repository_locks.setdefault(
+            repository_name(image), asyncio.Lock()
+        )
+        async with repository_lock, self._probe_semaphore:
+            await self._probe_release_info(update_info, image, labels, digests, tags_cache)
         self.async_update_listeners()
 
-    async def _fetch_container_labels(self, stack_id: str, service_name: str) -> dict[str, str]:
-        """Get the labels of a service's container (including image labels)."""
+    async def _inspect_container(
+        self, stack_id: str, service_name: str
+    ) -> tuple[dict[str, str], str | None]:
+        """Get the labels (including image labels) and image ID of a service's container."""
         try:
             async with asyncio.timeout(10):
                 response = await self.my_api.read.inspectStackContainer(
@@ -171,16 +209,42 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             _LOGGER.debug(
                 "Failed to inspect service %s in stack %s: %s", service_name, stack_id, e.error
             )
-            return {}
+            return {}, None
         except Exception as e:
             _LOGGER.debug(
                 "Failed to inspect service %s in stack %s: %s", service_name, stack_id, e
             )
-            return {}
-        return (response.config.labels if response.config else None) or {}
+            return {}, None
+        labels = (response.config.labels if response.config else None) or {}
+        return labels, response.image
+
+    async def _fetch_repo_digests(self, server_id: str, image_id: str) -> list[str]:
+        """Get the manifest digests (RepoDigests) of the image a container runs.
+
+        releaseprobe matches these against the registry's version tags when
+        the image uses a floating tag and its labels carry no usable version
+        (e.g. one inherited from the base image).
+        """
+        try:
+            async with asyncio.timeout(10):
+                response = await self.my_api.read.inspectImage(
+                    InspectImage(server=server_id, image=image_id)
+                )
+        except KomodoException as e:
+            _LOGGER.debug("Failed to inspect image %s on %s: %s", image_id, server_id, e.error)
+            return []
+        except Exception as e:
+            _LOGGER.debug("Failed to inspect image %s on %s: %s", image_id, server_id, e)
+            return []
+        return response.repo_digests or []
 
     async def _probe_release_info(
-        self, update_info: KomodoUpdateInfo, image: str, labels: dict[str, str]
+        self,
+        update_info: KomodoUpdateInfo,
+        image: str,
+        labels: dict[str, str],
+        digests: list[str],
+        tags_cache: dict[str, list[str]],
     ) -> None:
         """Query releaseprobe for the real new version and release notes."""
         if not image:
@@ -188,29 +252,48 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         try:
             # Passing the container's own labels lets releaseprobe resolve
             # the current version for floating tags (e.g. `latest`) and
-            # skips a redundant registry round-trip for pinned ones.
+            # skips a redundant registry round-trip for pinned ones. The
+            # image's digests are the fallback if the labels carry no usable
+            # version.
             check = await self.hass.async_add_executor_job(
                 partial(
                     check_for_update,
                     image,
                     labels,
                     logger=_RELEASEPROBE_LOGGER,
+                    current_digests=digests,
+                    tags_cache=tags_cache,
                 )
             )
-        except UnknownVersionError:
+        except UnknownVersionError as e:
             # Not a transient failure: the image uses a floating tag (e.g.
-            # `latest`) and doesn't label its version, so there's nothing to
-            # compare against until it's updated to an image that does.
+            # `latest`), its version label is missing or unusable, its digest
+            # matches none of the registry's version tags and it has no
+            # comparable revision, so there's nothing to compare against.
+            # The entity says so in its release summary.
             _LOGGER.info(
-                "Cannot determine the installed version of %s: it uses a floating tag "
-                "and has no org.opencontainers.image.version label, so no new version "
-                "or release notes can be shown",
+                "Cannot determine the installed version of %s, so no new version "
+                "or release notes can be shown: %s",
                 image,
+                e.reason,
             )
+            update_info.apply_unknown_version(e, labels)
+            return
+        except InvalidImageReferenceError as e:
+            # Not transient either: an image without a tag (or pinned by
+            # digest only) has no version to compare.
+            _LOGGER.info(
+                "Cannot check %s for a new version or release notes: %s", image, e
+            )
+            update_info.apply_invalid_image(e, labels, digests)
             return
         except Exception as e:
+            update_info.apply_failure(labels, str(e))
             _LOGGER.warning(
-                "Failed to look up the new version and release notes for %s: %s", image, e
+                "Failed to look up the new version and release notes for %s, retrying in %.0f min: %s",
+                image,
+                update_info.refresh_after / 60,
+                e,
             )
             return
         update_info.apply_release_info(check)

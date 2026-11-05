@@ -6,10 +6,11 @@ from typing import Any
 from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from komodo_api.types import DeployStack, Update
+from komodo_api.types import CheckStackForUpdate, DeployStack, Update
 
 from .utils import wait_for_completion, create_stack_device_info
 
@@ -24,9 +25,7 @@ _LOGGER = logging.getLogger(__name__)
 class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
     """Update entity for a service in a stack."""
 
-    _attr_supported_features = (
-        UpdateEntityFeature.INSTALL | UpdateEntityFeature.RELEASE_NOTES
-    )
+    _attr_supported_features = UpdateEntityFeature.INSTALL
 
     def __init__(
         self,
@@ -65,12 +64,19 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
             self._attr_title = f"{self._service_name}: "
             self._attr_release_summary = service.update_info.release_summary
             self._attr_release_url = service.update_info.release_url
+            # Only offer the release notes dialog if there's something to show.
+            self._attr_supported_features = (
+                UpdateEntityFeature.INSTALL | UpdateEntityFeature.RELEASE_NOTES
+                if service.update_info.release_notes
+                else UpdateEntityFeature.INSTALL
+            )
         else:
             self._attr_installed_version = "0"
             self._attr_latest_version = "0"
             self._attr_title = None
             self._attr_release_summary = None
             self._attr_release_url = None
+            self._attr_supported_features = UpdateEntityFeature.INSTALL
 
     def release_notes(self) -> str | None:
         """Return full release notes markdown for the pending update."""
@@ -91,7 +97,26 @@ class KomodoUpdateEntity(CoordinatorEntity[KomodoCoordinator], UpdateEntity):
             update,
             f"Update of {self._stack_name}/{self._service_name}",
         )
+        await self._recheck_stack_for_updates()
         await self.coordinator.async_refresh()
+
+    async def _recheck_stack_for_updates(self) -> None:
+        """Make Komodo re-check the stack's images after deploying one service.
+
+        Deploying a stack (even just one of its services) clears Komodo's
+        cached "update available" flags for all of its services until its
+        next scheduled check. Without this, the other services' pending
+        updates would vanish for a few minutes, as if the whole stack had
+        been updated.
+        """
+        try:
+            await self.coordinator.my_api.write.checkStackForUpdate(
+                CheckStackForUpdate(stack=self._stack_id, skip_auto_update=True)
+            )
+        except Exception as e:  # noqa: BLE001
+            _LOGGER.debug(
+                "Failed to re-check stack %s for updates: %s", self._stack_name, e
+            )
 
     @callback
     def _handle_coordinator_update(self) -> None:
