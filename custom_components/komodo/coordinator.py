@@ -177,7 +177,7 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         self,
         update_info: KomodoUpdateInfo,
         stack_id: str,
-        server_id: str,
+        server_id: str | None,
         service_name: str,
         image: str,
         tags_cache: dict[str, list[str]],
@@ -186,7 +186,11 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
         labels, image_id = await self._inspect_container(stack_id, service_name)
         update_info.apply_labels(labels)
         self.async_update_listeners()
-        digests = await self._fetch_repo_digests(server_id, image_id) if image_id else []
+        digests = (
+            await self._fetch_repo_digests(server_id, image_id)
+            if image_id and server_id
+            else []
+        )
         # Probes of the same repository run one after the other, so the
         # second one finds the tag listing of the first in tags_cache.
         repository_lock = self._probe_repository_locks.setdefault(

@@ -1,5 +1,7 @@
 import pytest
-from custom_components.komodo.utils import fix_host, parse_docker_percent, parse_docker_size, split_docker_pair
+from unittest.mock import MagicMock
+
+from custom_components.komodo.utils import create_stack_device_info, fix_host, parse_docker_percent, parse_docker_size, split_docker_pair
 
 @pytest.mark.parametrize("input_host,expected", [
     ("http://192.168.1.1", "http://192.168.1.1"),
@@ -50,3 +52,11 @@ def test_split_docker_pair(text, expected):
 ])
 def test_parse_docker_percent(text, expected):
     assert parse_docker_percent(text) == expected
+
+
+def test_unassigned_stack_device_has_no_parent():
+    stack = MagicMock(id="s1", server_id=None)
+    stack.name = "s1"
+    info = create_stack_device_info(stack, {"": "dev"})
+    assert "via_device" not in info
+    assert "via_device_id" not in info

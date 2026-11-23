@@ -28,6 +28,9 @@ def create_stack_device_info(
         name=stack.name,
         manufacturer="Komodo",
     )
+    if not stack.server_id:
+        # Unassigned stack: there is no server device to link to.
+        return device_info
     if not _SUPPORTS_VIA_DEVICE_ID:
         device_info["via_device"] = (DOMAIN, stack.server_id)
     elif (server_device_id := server_device_ids.get(stack.server_id)) is not None:

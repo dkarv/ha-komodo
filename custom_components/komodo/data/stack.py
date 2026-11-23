@@ -14,7 +14,7 @@ class KomodoStack:
     state: StackState | None
     id: str
     name: str
-    server_id: str
+    server_id: str | None
     services: dict[str, KomodoService]
     alerts: List[str]
 
@@ -22,7 +22,8 @@ class KomodoStack:
         self.state = item.info.state
         self.id = item.id
         self.name = item.name
-        self.server_id = item.info.server_id
+        # Komodo reports an empty server_id for stacks not assigned to a server.
+        self.server_id = item.info.server_id or None
         self.services = {}
         self.alerts = []
 
@@ -41,7 +42,7 @@ class KomodoStack:
         self.state = None
         self.id = stack_id
         self.name = f"Unknown Stack {stack_id}"
-        self.server_id = "unknown"
+        self.server_id = None
         self.services = {}
         self.alerts = []
         return self

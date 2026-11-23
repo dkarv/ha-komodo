@@ -50,10 +50,12 @@ class KomodoData:
             stack = KomodoStack(_stack)
             self.stacks[_stack.id] = stack
 
-            # Update server stack count
-            server = self.get_server(_stack.info.server_id)
-            server.add_stack()
-            server.add_services(len(_stack.info.services))
+            # Update server stack count. Unassigned stacks have no server, so
+            # don't create an "Unknown Server" placeholder for them.
+            if stack.server_id:
+                server = self.get_server(stack.server_id)
+                server.add_stack()
+                server.add_services(len(_stack.info.services))
 
             for service in _stack.info.services:
                 stack.add_service(KomodoService(service))
