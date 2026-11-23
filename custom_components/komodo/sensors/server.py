@@ -21,6 +21,7 @@ def create_server_sensors(
             identifiers={(DOMAIN, server.id)},
             name=server.name,
             manufacturer="Komodo",
+            model="Server",
             sw_version=server.periphery_version,
             configuration_url=config_url,
         )

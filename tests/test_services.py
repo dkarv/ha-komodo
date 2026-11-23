@@ -1,131 +1,249 @@
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+import voluptuous as vol
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import device_registry as dr
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.komodo.const import DOMAIN
 from custom_components.komodo.services import (
+    SERVICE_GLOBAL_AUTO_UPDATE,
     SERVICE_PRUNE_DOCKER,
     SERVICE_RESTART_ALL_CONTAINERS,
-    SERVICE_GLOBAL_AUTO_UPDATE,
     async_setup_services,
-    async_unload_services,
 )
-from custom_components.komodo.base import KomodoBase
 
 
-@pytest.fixture
-def mock_hass():
-    hass = MagicMock()
-    hass.data = {DOMAIN: {}}
-    services = {}
-
-    def async_register(domain, service, handler):
-        services[(domain, service)] = handler
-
-    def async_remove(domain, service):
-        services.pop((domain, service), None)
-
-    def has_service(domain, service):
-        return (domain, service) in services
-
-    hass.services.async_register = MagicMock(side_effect=async_register)
-    hass.services.async_remove = MagicMock(side_effect=async_remove)
-    hass.services.has_service = MagicMock(side_effect=has_service)
-    hass._services = services
-    return hass
+def _server(id, name, state="OK"):
+    server = MagicMock(id=id, state=state)
+    server.name = name
+    return server
 
 
-@pytest.fixture
-def mock_komodo(mock_hass):
-    komodo = MagicMock(spec=KomodoBase)
-    komodo.api = MagicMock()
-    komodo.api.execute.pruneSystem = AsyncMock()
-    komodo.api.execute.pruneImages = AsyncMock()
-    komodo.api.execute.pruneContainers = AsyncMock()
-    komodo.api.execute.pruneVolumes = AsyncMock()
-    komodo.api.execute.pruneBuildx = AsyncMock()
-    komodo.api.execute.restartAllContainers = AsyncMock()
-    komodo.api.execute.globalAutoUpdate = AsyncMock()
+def _add_instance(hass, entry_id, servers, state=ConfigEntryState.LOADED):
+    """Add a Komodo config entry with a mocked API and a device per server."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id=entry_id, title=entry_id, state=state)
+    entry.add_to_hass(hass)
 
-    mock_server = MagicMock()
-    mock_server.id = "srv_1"
-    mock_server.name = "oracle-vm"
-    mock_server.is_unknown = False
-
-    komodo.coordinator = MagicMock()
-    komodo.coordinator.data = MagicMock()
-    komodo.coordinator.data.servers = {"srv_1": mock_server}
+    komodo = MagicMock()
+    komodo.api.execute = MagicMock()
+    komodo.coordinator.data.servers = {s.id: s for s in servers}
     komodo.coordinator.async_request_refresh = AsyncMock()
+    hass.data.setdefault(DOMAIN, {})[entry_id] = komodo
 
-    mock_hass.data[DOMAIN]["entry_1"] = komodo
-    return komodo
-
-
-def test_service_setup_and_unload(mock_hass):
-    asyncio.run(async_setup_services(mock_hass))
-    assert mock_hass.services.has_service(DOMAIN, SERVICE_PRUNE_DOCKER)
-    assert mock_hass.services.has_service(DOMAIN, SERVICE_RESTART_ALL_CONTAINERS)
-    assert mock_hass.services.has_service(DOMAIN, SERVICE_GLOBAL_AUTO_UPDATE)
-
-    # Empty entries and unload
-    mock_hass.data[DOMAIN].clear()
-    asyncio.run(async_unload_services(mock_hass))
-    assert not mock_hass.services.has_service(DOMAIN, SERVICE_PRUNE_DOCKER)
+    device_reg = dr.async_get(hass)
+    devices = {
+        s.id: device_reg.async_get_or_create(
+            config_entry_id=entry_id,
+            identifiers={(DOMAIN, s.id)},
+            name=s.name,
+            model="Server",
+        ).id
+        for s in servers
+    }
+    return komodo, devices
 
 
-def test_prune_docker_service(mock_hass, mock_komodo):
-    asyncio.run(async_setup_services(mock_hass))
-    prune_handler = mock_hass._services[(DOMAIN, SERVICE_PRUNE_DOCKER)]
-
-    with patch("custom_components.komodo.services.wait_for_completion", AsyncMock()):
-        # 1. Prune system on all servers (omitted server param)
-        call = MagicMock()
-        call.data = {"prune_type": "system"}
-        asyncio.run(prune_handler(call))
-        assert mock_komodo.api.execute.pruneSystem.await_count == 1
-
-        # 2. Prune images by server name
-        call = MagicMock()
-        call.data = {"server": "oracle-vm", "prune_type": "images"}
-        asyncio.run(prune_handler(call))
-        assert mock_komodo.api.execute.pruneImages.await_count == 1
-
-        # 3. Prune containers by server id
-        call = MagicMock()
-        call.data = {"server": "srv_1", "prune_type": "containers"}
-        asyncio.run(prune_handler(call))
-        assert mock_komodo.api.execute.pruneContainers.await_count == 1
-
-        # 4. Prune volumes
-        call = MagicMock()
-        call.data = {"server": "srv_1", "prune_type": "volumes"}
-        asyncio.run(prune_handler(call))
-        assert mock_komodo.api.execute.pruneVolumes.await_count == 1
-
-        # 5. Prune buildx
-        call = MagicMock()
-        call.data = {"server": "srv_1", "prune_type": "buildx"}
-        asyncio.run(prune_handler(call))
-        assert mock_komodo.api.execute.pruneBuildx.await_count == 1
+def _update(success=True):
+    return MagicMock(success=success)
 
 
-def test_restart_all_containers_service(mock_hass, mock_komodo):
-    asyncio.run(async_setup_services(mock_hass))
-    restart_handler = mock_hass._services[(DOMAIN, SERVICE_RESTART_ALL_CONTAINERS)]
+@pytest.fixture
+def wait():
+    """Make wait_for_completion return the update it was given."""
+    async def passthrough(api, update, title):
+        return update
 
-    with patch("custom_components.komodo.services.wait_for_completion", AsyncMock()):
-        call = MagicMock()
-        call.data = {"server": "oracle-vm"}
-        asyncio.run(restart_handler(call))
-        assert mock_komodo.api.execute.restartAllContainers.await_count == 1
+    with patch(
+        "custom_components.komodo.services.wait_for_completion", side_effect=passthrough
+    ) as mock:
+        yield mock
 
 
-def test_global_auto_update_service(mock_hass, mock_komodo):
-    asyncio.run(async_setup_services(mock_hass))
-    update_handler = mock_hass._services[(DOMAIN, SERVICE_GLOBAL_AUTO_UPDATE)]
+@pytest.fixture
+async def setup(hass):
+    async_setup_services(hass)
 
-    with patch("custom_components.komodo.services.wait_for_completion", AsyncMock()):
-        call = MagicMock()
-        call.data = {"skip_auto_update": True}
-        asyncio.run(update_handler(call))
-        assert mock_komodo.api.execute.globalAutoUpdate.await_count == 1
+
+async def test_services_registered(hass, setup):
+    for service in (
+        SERVICE_PRUNE_DOCKER,
+        SERVICE_RESTART_ALL_CONTAINERS,
+        SERVICE_GLOBAL_AUTO_UPDATE,
+    ):
+        assert hass.services.has_service(DOMAIN, service)
+
+
+@pytest.mark.parametrize(
+    ("prune_type", "method"),
+    [
+        ("images", "pruneImages"),
+        ("containers", "pruneContainers"),
+        ("volumes", "pruneVolumes"),
+        ("buildx", "pruneBuildx"),
+        ("system", "pruneSystem"),
+    ],
+)
+async def test_prune_docker(hass, setup, wait, prune_type, method):
+    komodo, devices = _add_instance(hass, "e1", [_server("srv1", "vm")])
+    api_call = AsyncMock(return_value=_update())
+    setattr(komodo.api.execute, method, api_call)
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_PRUNE_DOCKER,
+        {"server": [devices["srv1"]], "prune_type": prune_type},
+        blocking=True,
+    )
+
+    api_call.assert_awaited_once()
+    assert api_call.await_args.args[0].server == "srv1"
+    komodo.coordinator.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {},  # no server, no type: must not prune anything anywhere
+        {"server": []},
+        {"prune_type": "images"},
+        {"server": ["x"]},  # prune_type is required
+        {"server": ["x"], "prune_type": "image"},  # typo must not fall back to system
+    ],
+)
+async def test_prune_docker_rejects_invalid_input(hass, setup, data):
+    komodo, _ = _add_instance(hass, "e1", [_server("srv1", "vm")])
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(DOMAIN, SERVICE_PRUNE_DOCKER, data, blocking=True)
+
+    komodo.api.execute.pruneSystem.assert_not_called()
+
+
+async def test_servers_across_instances(hass, setup, wait):
+    """Each selected server is pruned by the Komodo instance it belongs to."""
+    k1, d1 = _add_instance(hass, "e1", [_server("a", "vm-a")])
+    k2, d2 = _add_instance(hass, "e2", [_server("b", "vm-b")])
+    k1.api.execute.restartAllContainers = AsyncMock(return_value=_update())
+    k2.api.execute.restartAllContainers = AsyncMock(return_value=_update())
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_RESTART_ALL_CONTAINERS,
+        {"server": [d1["a"], d2["b"]]},
+        blocking=True,
+    )
+
+    assert k1.api.execute.restartAllContainers.await_args.args[0].server == "a"
+    assert k2.api.execute.restartAllContainers.await_args.args[0].server == "b"
+    k1.coordinator.async_request_refresh.assert_awaited_once()
+    k2.coordinator.async_request_refresh.assert_awaited_once()
+
+
+async def test_non_server_device_rejected(hass, setup):
+    komodo, _ = _add_instance(hass, "e1", [_server("srv1", "vm")])
+    stack_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id="e1", identifiers={(DOMAIN, "stack1")}, name="web"
+    )
+
+    with pytest.raises(ServiceValidationError, match="not a Komodo server"):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_RESTART_ALL_CONTAINERS,
+            {"server": [stack_device.id]},
+            blocking=True,
+        )
+    komodo.api.execute.restartAllContainers.assert_not_called()
+
+
+async def test_placeholder_server_rejected(hass, setup):
+    _, devices = _add_instance(hass, "e1", [_server("gone", "Unknown Server gone", state=None)])
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_RESTART_ALL_CONTAINERS,
+            {"server": [devices["gone"]]},
+            blocking=True,
+        )
+
+
+async def test_unloaded_instance_rejected(hass, setup):
+    _, devices = _add_instance(
+        hass, "e1", [_server("srv1", "vm")], state=ConfigEntryState.NOT_LOADED
+    )
+
+    with pytest.raises(ServiceValidationError, match="not loaded"):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_RESTART_ALL_CONTAINERS,
+            {"server": [devices["srv1"]]},
+            blocking=True,
+        )
+
+
+async def test_failed_update_raises_after_running_all(hass, setup, wait):
+    """A failed Komodo update fails the call, but the other servers still run."""
+    komodo, devices = _add_instance(hass, "e1", [_server("a", "vm-a"), _server("b", "vm-b")])
+    komodo.api.execute.pruneImages = AsyncMock(
+        side_effect=[_update(success=False), _update()]
+    )
+
+    with pytest.raises(HomeAssistantError, match="Prune images on vm-a: failed"):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_PRUNE_DOCKER,
+            {"server": [devices["a"], devices["b"]], "prune_type": "images"},
+            blocking=True,
+        )
+
+    assert komodo.api.execute.pruneImages.await_count == 2
+    komodo.coordinator.async_request_refresh.assert_awaited_once()
+
+
+async def test_api_error_raises(hass, setup, wait):
+    komodo, devices = _add_instance(hass, "e1", [_server("srv1", "vm")])
+    komodo.api.execute.restartAllContainers = AsyncMock(side_effect=RuntimeError("boom"))
+
+    with pytest.raises(HomeAssistantError, match="boom"):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_RESTART_ALL_CONTAINERS,
+            {"server": [devices["srv1"]]},
+            blocking=True,
+        )
+
+
+async def test_global_auto_update(hass, setup, wait):
+    k1, _ = _add_instance(hass, "e1", [])
+    k2, _ = _add_instance(hass, "e2", [])
+    k1.api.execute.globalAutoUpdate = AsyncMock(return_value=_update())
+    k2.api.execute.globalAutoUpdate = AsyncMock(return_value=_update())
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_GLOBAL_AUTO_UPDATE,
+        {"config_entry_id": "e2", "skip_auto_update": True},
+        blocking=True,
+    )
+
+    k1.api.execute.globalAutoUpdate.assert_not_called()
+    assert k2.api.execute.globalAutoUpdate.await_args.args[0].skip_auto_update is True
+
+
+async def test_global_auto_update_requires_instance(hass, setup):
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN, SERVICE_GLOBAL_AUTO_UPDATE, {}, blocking=True
+        )
+
+
+async def test_global_auto_update_rejects_other_domain(hass, setup):
+    MockConfigEntry(domain="other", entry_id="x").add_to_hass(hass)
+
+    with pytest.raises(ServiceValidationError, match="not a Komodo config entry"):
+        await hass.services.async_call(
+            DOMAIN, SERVICE_GLOBAL_AUTO_UPDATE, {"config_entry_id": "x"}, blocking=True
+        )

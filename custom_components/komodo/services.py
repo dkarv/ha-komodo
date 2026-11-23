@@ -1,21 +1,28 @@
 """Services for the Komodo integration."""
 
+from collections.abc import Awaitable, Callable
 import logging
-from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import HomeAssistantError
 
+import voluptuous as vol
+
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import config_validation as cv, device_registry as dr
+from komodo_api.lib import KomodoClient
 from komodo_api.types import (
-    PruneSystem,
-    PruneImages,
-    PruneContainers,
-    PruneVolumes,
-    PruneBuildx,
-    RestartAllContainers,
     GlobalAutoUpdate,
+    PruneBuildx,
+    PruneContainers,
+    PruneImages,
+    PruneSystem,
+    PruneVolumes,
+    RestartAllContainers,
+    Update,
 )
 
-from .const import DOMAIN
 from .base import KomodoBase
+from .const import DOMAIN
 from .utils import wait_for_completion
 
 _LOGGER = logging.getLogger(__name__)
@@ -24,123 +31,164 @@ SERVICE_PRUNE_DOCKER = "prune_docker"
 SERVICE_RESTART_ALL_CONTAINERS = "restart_all_containers"
 SERVICE_GLOBAL_AUTO_UPDATE = "global_auto_update"
 
+ATTR_SERVER = "server"
+ATTR_PRUNE_TYPE = "prune_type"
+ATTR_CONFIG_ENTRY_ID = "config_entry_id"
+ATTR_SKIP_AUTO_UPDATE = "skip_auto_update"
 
-def _get_komodo_instances(hass: HomeAssistant) -> list[KomodoBase]:
-    """Get all loaded KomodoBase instances."""
-    if DOMAIN not in hass.data:
-        return []
-    return [
-        inst for inst in hass.data[DOMAIN].values()
-        if isinstance(inst, KomodoBase)
-    ]
+PRUNE_ACTIONS: dict[str, Callable[[KomodoClient, str], Awaitable[Update]]] = {
+    "images": lambda api, s: api.execute.pruneImages(PruneImages(server=s)),
+    "containers": lambda api, s: api.execute.pruneContainers(PruneContainers(server=s)),
+    "volumes": lambda api, s: api.execute.pruneVolumes(PruneVolumes(server=s)),
+    "buildx": lambda api, s: api.execute.pruneBuildx(PruneBuildx(server=s)),
+    "system": lambda api, s: api.execute.pruneSystem(PruneSystem(server=s)),
+}
+
+SERVERS_SCHEMA = vol.All(cv.ensure_list, [cv.string], vol.Length(min=1))
+
+PRUNE_DOCKER_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_SERVER): SERVERS_SCHEMA,
+        vol.Required(ATTR_PRUNE_TYPE): vol.In(list(PRUNE_ACTIONS)),
+    }
+)
+RESTART_ALL_CONTAINERS_SCHEMA = vol.Schema({vol.Required(ATTR_SERVER): SERVERS_SCHEMA})
+GLOBAL_AUTO_UPDATE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Optional(ATTR_SKIP_AUTO_UPDATE, default=False): cv.boolean,
+    }
+)
 
 
-def _resolve_server_id(komodo: KomodoBase, target: str) -> str:
-    """Resolve server ID from server name or ID."""
-    if komodo.coordinator and komodo.coordinator.data and komodo.coordinator.data.servers:
-        if target in komodo.coordinator.data.servers:
-            return target
-        for srv in komodo.coordinator.data.servers.values():
-            if srv.name == target:
-                return srv.id
-    return target
+def _komodo_for_entry(hass: HomeAssistant, entry_id: str) -> KomodoBase:
+    """Return the loaded Komodo instance of a config entry."""
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None or entry.domain != DOMAIN:
+        raise ServiceValidationError(f"{entry_id} is not a Komodo config entry")
+    if entry.state is not ConfigEntryState.LOADED:
+        raise ServiceValidationError(f"Komodo instance {entry.title} is not loaded")
+    return hass.data[DOMAIN][entry_id]
 
 
-async def async_setup_services(hass: HomeAssistant) -> None:
-    """Register custom Komodo services."""
-
-    async def handle_prune_docker(call: ServiceCall) -> None:
-        """Handle docker pruning service call."""
-        instances = _get_komodo_instances(hass)
-        if not instances:
-            raise HomeAssistantError("No active Komodo instances found.")
-
-        target_server = call.data.get("server")
-        prune_type = str(call.data.get("prune_type", "system")).lower()
-
-        for komodo in instances:
-            servers_to_prune: list[str] = []
-            if target_server:
-                servers_to_prune.append(_resolve_server_id(komodo, str(target_server)))
-            elif komodo.coordinator and komodo.coordinator.data:
-                servers_to_prune = [
-                    s.id for s in komodo.coordinator.data.servers.values()
-                    if s.id and not s.is_unknown
-                ]
-
-            for srv_id in servers_to_prune:
-                _LOGGER.info("Pruning %s on server %s", prune_type, srv_id)
-                if prune_type == "images":
-                    update = await komodo.api.execute.pruneImages(PruneImages(server=srv_id))
-                elif prune_type == "containers":
-                    update = await komodo.api.execute.pruneContainers(PruneContainers(server=srv_id))
-                elif prune_type == "volumes":
-                    update = await komodo.api.execute.pruneVolumes(PruneVolumes(server=srv_id))
-                elif prune_type == "buildx":
-                    update = await komodo.api.execute.pruneBuildx(PruneBuildx(server=srv_id))
-                else:
-                    update = await komodo.api.execute.pruneSystem(PruneSystem(server=srv_id))
-
-                await wait_for_completion(komodo.api, update, f"Prune {prune_type} on {srv_id}")
-
-            if komodo.coordinator:
-                await komodo.coordinator.async_request_refresh()
-
-    async def handle_restart_all_containers(call: ServiceCall) -> None:
-        """Handle restart all containers service call."""
-        instances = _get_komodo_instances(hass)
-        if not instances:
-            raise HomeAssistantError("No active Komodo instances found.")
-
-        target_server = call.data.get("server")
-        if not target_server:
-            raise HomeAssistantError("A target server must be specified.")
-
-        for komodo in instances:
-            srv_id = _resolve_server_id(komodo, str(target_server))
-            _LOGGER.info("Restarting all containers on server %s", srv_id)
-            update = await komodo.api.execute.restartAllContainers(
-                RestartAllContainers(server=srv_id)
+def _resolve_servers(
+    hass: HomeAssistant, device_ids: list[str]
+) -> list[tuple[KomodoBase, str, str]]:
+    """Map server device ids to (komodo instance, server id, server name)."""
+    device_reg = dr.async_get(hass)
+    targets = []
+    for device_id in device_ids:
+        device = device_reg.async_get(device_id)
+        if device is None:
+            raise ServiceValidationError(f"Unknown device {device_id}")
+        for entry_id in device.config_entries:
+            entry = hass.config_entries.async_get_entry(entry_id)
+            if entry is None or entry.domain != DOMAIN:
+                continue
+            komodo = _komodo_for_entry(hass, entry_id)
+            servers = komodo.coordinator.data.servers
+            server = next(
+                (
+                    servers[ident]
+                    for domain, ident in device.identifiers
+                    if domain == DOMAIN and ident in servers
+                ),
+                None,
             )
-            await wait_for_completion(komodo.api, update, f"Restart containers on {srv_id}")
-            if komodo.coordinator:
-                await komodo.coordinator.async_request_refresh()
-
-    async def handle_global_auto_update(call: ServiceCall) -> None:
-        """Handle global auto update service call."""
-        instances = _get_komodo_instances(hass)
-        if not instances:
-            raise HomeAssistantError("No active Komodo instances found.")
-
-        skip_auto_update = bool(call.data.get("skip_auto_update", False))
-        for komodo in instances:
-            _LOGGER.info("Triggering global auto update")
-            update = await komodo.api.execute.globalAutoUpdate(
-                GlobalAutoUpdate(skip_auto_update=skip_auto_update)
+            # Placeholder servers (see KomodoServer.unknown) have no state.
+            if server is not None and server.state is not None:
+                targets.append((komodo, server.id, server.name))
+                break
+        else:
+            raise ServiceValidationError(
+                f"Device {device.name_by_user or device.name} is not a Komodo server"
             )
-            await wait_for_completion(komodo.api, update, "Global auto update")
-            if komodo.coordinator:
-                await komodo.coordinator.async_request_refresh()
-
-    if not hass.services.has_service(DOMAIN, SERVICE_PRUNE_DOCKER):
-        hass.services.async_register(DOMAIN, SERVICE_PRUNE_DOCKER, handle_prune_docker)
-
-    if not hass.services.has_service(DOMAIN, SERVICE_RESTART_ALL_CONTAINERS):
-        hass.services.async_register(DOMAIN, SERVICE_RESTART_ALL_CONTAINERS, handle_restart_all_containers)
-
-    if not hass.services.has_service(DOMAIN, SERVICE_GLOBAL_AUTO_UPDATE):
-        hass.services.async_register(DOMAIN, SERVICE_GLOBAL_AUTO_UPDATE, handle_global_auto_update)
+    return targets
 
 
-async def async_unload_services(hass: HomeAssistant) -> None:
-    """Unload Komodo services if no config entries remain."""
-    if DOMAIN in hass.data and len(hass.data[DOMAIN]) > 0:
-        return
+async def _run(
+    komodo: KomodoBase,
+    title: str,
+    action: Callable[[KomodoClient], Awaitable[Update]],
+) -> str | None:
+    """Run a Komodo action to completion. Returns an error message on failure."""
+    _LOGGER.info("Starting %s", title)
+    try:
+        update = await wait_for_completion(komodo.api, await action(komodo.api), title)
+    except Exception as err:  # noqa: BLE001 - report every API failure to the caller
+        _LOGGER.error("%s failed: %s", title, err)
+        return f"{title}: {err}"
+    if not update.success:
+        return f"{title}: failed, see the Komodo logs"
+    return None
 
-    for service in (
-        SERVICE_PRUNE_DOCKER,
-        SERVICE_RESTART_ALL_CONTAINERS,
-        SERVICE_GLOBAL_AUTO_UPDATE,
+
+async def _run_all(
+    jobs: list[tuple[KomodoBase, str, Callable[[KomodoClient], Awaitable[Update]]]],
+) -> None:
+    """Run all jobs, refresh the affected instances and raise if any failed."""
+    errors = [err for k, title, action in jobs if (err := await _run(k, title, action))]
+    for komodo in {id(k): k for k, _, _ in jobs}.values():
+        await komodo.coordinator.async_request_refresh()
+    if errors:
+        raise HomeAssistantError("; ".join(errors))
+
+
+async def _handle_prune_docker(hass: HomeAssistant, call: ServiceCall) -> None:
+    prune_type = call.data[ATTR_PRUNE_TYPE]
+    prune = PRUNE_ACTIONS[prune_type]
+    await _run_all(
+        [
+            (komodo, f"Prune {prune_type} on {name}", lambda api, s=srv_id: prune(api, s))
+            for komodo, srv_id, name in _resolve_servers(hass, call.data[ATTR_SERVER])
+        ]
+    )
+
+
+async def _handle_restart_all_containers(hass: HomeAssistant, call: ServiceCall) -> None:
+    await _run_all(
+        [
+            (
+                komodo,
+                f"Restart all containers on {name}",
+                lambda api, s=srv_id: api.execute.restartAllContainers(
+                    RestartAllContainers(server=s)
+                ),
+            )
+            for komodo, srv_id, name in _resolve_servers(hass, call.data[ATTR_SERVER])
+        ]
+    )
+
+
+async def _handle_global_auto_update(hass: HomeAssistant, call: ServiceCall) -> None:
+    komodo = _komodo_for_entry(hass, call.data[ATTR_CONFIG_ENTRY_ID])
+    skip = call.data[ATTR_SKIP_AUTO_UPDATE]
+    await _run_all(
+        [
+            (
+                komodo,
+                "Global auto update",
+                lambda api: api.execute.globalAutoUpdate(
+                    GlobalAutoUpdate(skip_auto_update=skip)
+                ),
+            )
+        ]
+    )
+
+
+def async_setup_services(hass: HomeAssistant) -> None:
+    """Register the Komodo services (once, from async_setup)."""
+    for service, handler, schema in (
+        (SERVICE_PRUNE_DOCKER, _handle_prune_docker, PRUNE_DOCKER_SCHEMA),
+        (
+            SERVICE_RESTART_ALL_CONTAINERS,
+            _handle_restart_all_containers,
+            RESTART_ALL_CONTAINERS_SCHEMA,
+        ),
+        (SERVICE_GLOBAL_AUTO_UPDATE, _handle_global_auto_update, GLOBAL_AUTO_UPDATE_SCHEMA),
     ):
-        if hass.services.has_service(DOMAIN, service):
-            hass.services.async_remove(DOMAIN, service)
+
+        async def _call(call: ServiceCall, handler=handler) -> None:
+            await handler(hass, call)
+
+        hass.services.async_register(DOMAIN, service, _call, schema=schema)

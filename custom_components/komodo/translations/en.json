@@ -103,35 +103,39 @@
     "services": {
         "prune_docker": {
             "name": "Prune Docker resources",
-            "description": "Prune dangling images, stopped containers, buildx cache, or system resources on a Komodo server.",
+            "description": "Removes unused Docker resources on the selected Komodo servers. Deleted data cannot be recovered.",
             "fields": {
                 "server": {
-                    "name": "Server",
-                    "description": "The Komodo server name or ID to prune (leave empty to prune all connected servers)."
+                    "name": "Servers",
+                    "description": "The Komodo servers to prune."
                 },
                 "prune_type": {
                     "name": "Prune type",
-                    "description": "Type of Docker resources to prune (system, images, containers, volumes, buildx)."
+                    "description": "What to remove. 'Unused volumes' deletes every volume not attached to a container. 'Full system' also removes stopped containers first, so their volumes are deleted as well."
                 }
             }
         },
         "restart_all_containers": {
             "name": "Restart all containers",
-            "description": "Gracefully restart all running Docker containers on a specific Komodo server.",
+            "description": "Restarts all containers on the selected Komodo servers.",
             "fields": {
                 "server": {
-                    "name": "Server",
-                    "description": "The Komodo server name or ID."
+                    "name": "Servers",
+                    "description": "The Komodo servers whose containers to restart."
                 }
             }
         },
         "global_auto_update": {
             "name": "Global auto update",
-            "description": "Trigger a global auto-update batch across all stacks and deployments in Komodo.",
+            "description": "Checks all stacks and deployments with update polling enabled for new images, and redeploys those with auto update enabled. Requires an admin API key.",
             "fields": {
+                "config_entry_id": {
+                    "name": "Komodo instance",
+                    "description": "The Komodo instance to run the update check on."
+                },
                 "skip_auto_update": {
-                    "name": "Skip auto-update flag check",
-                    "description": "Whether to force update resources regardless of their auto-update configuration."
+                    "name": "Skip auto update",
+                    "description": "Only check for updates, do not redeploy resources that have auto update enabled."
                 }
             }
         }
@@ -147,6 +151,17 @@
                     "container_network": "Enable container network sensors",
                     "container_disk": "Enable container disk I/O sensors"
                 }
+            }
+        }
+    },
+    "selector": {
+        "prune_type": {
+            "options": {
+                "images": "Unused images (docker image prune -a)",
+                "containers": "Stopped containers (docker container prune)",
+                "volumes": "Unused volumes (docker volume prune -a)",
+                "buildx": "Buildx cache (docker buildx prune -a)",
+                "system": "Full system, including volumes (docker system prune -a --volumes)"
             }
         }
     }
