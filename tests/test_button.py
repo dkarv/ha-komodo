@@ -46,38 +46,68 @@ def test_async_press_calls_runProcedure(monkeypatch, mock_komodo_api, mock_proce
     assert called['name'] == "Procedure Test Procedure"
 
 
-def test_build_run_button(monkeypatch, mock_komodo_api):
+def _coordinator(**data):
     coordinator = MagicMock()
-    coordinator.data = MagicMock()
+    coordinator.data = MagicMock(**data)
+    coordinator.host_url = "https://komodo.example.com"
+    coordinator.server_device_ids = {}
     coordinator.async_request_refresh = AsyncMock()
+    return coordinator
 
-    device_info = MagicMock()
-    btn = button.KomodoBuildRunButton(
-        coordinator=coordinator,
-        api=mock_komodo_api,
-        item_id="entry_b1",
-        build_id="b1",
-        build_name="jarvis-hub",
-        device_info=device_info,
-    )
+
+def _resource(id, name, **attrs):
+    r = MagicMock(id=id, **attrs)
+    r.name = name
+    return r
+
+
+def _fake_wait(monkeypatch):
+    called = {}
+
+    async def fake_wait_for_completion(api, update, name):
+        called["update"] = update
+        called["name"] = name
+
+    monkeypatch.setattr(button, "wait_for_completion", fake_wait_for_completion)
+    return called
+
+
+def test_build_run_button(monkeypatch, mock_komodo_api):
+    build = _resource("b1", "jarvis-hub", version="1.2.3", built_hash=None)
+    coordinator = _coordinator(builds={"b1": build})
+
+    [btn] = button.create_build_buttons(coordinator, mock_komodo_api, "entry")
     assert btn._attr_entity_registry_enabled_default is False
     assert btn._attr_unique_id == "entry_b1_run_button"
     assert btn._attr_name == "Run jarvis-hub build"
 
     mock_update = MagicMock()
     mock_komodo_api.execute.runBuild = AsyncMock(return_value=mock_update)
-
-    called = {}
-    async def fake_wait_for_completion(api, update, name):
-        called['api'] = api
-        called['update'] = update
-        called['name'] = name
-        return "done"
-    monkeypatch.setattr(button, "wait_for_completion", fake_wait_for_completion)
+    called = _fake_wait(monkeypatch)
 
     asyncio.run(btn.async_press())
     mock_komodo_api.execute.runBuild.assert_awaited_once_with(
         button.RunBuild(build="b1")
     )
-    assert called['name'] == "Run build jarvis-hub"
+    assert called["update"] == mock_update
+    assert called["name"] == "Run jarvis-hub build"
+    coordinator.async_request_refresh.assert_awaited_once()
+
+
+def test_stack_deploy_button(monkeypatch, mock_komodo_api):
+    stack = _resource("s1", "web", server_id=None, deployed_hash=None, branch=None)
+    coordinator = _coordinator(stacks={"s1": stack})
+
+    [btn] = button.create_deploy_buttons_for_stacks(coordinator, mock_komodo_api, "entry")
+    assert btn._attr_entity_registry_enabled_default is True
+    assert btn._attr_unique_id == "entry_s1_deploy_button"
+    assert btn._attr_name == "Deploy web stack"
+
+    mock_komodo_api.execute.deployStack = AsyncMock()
+    _fake_wait(monkeypatch)
+
+    asyncio.run(btn.async_press())
+    mock_komodo_api.execute.deployStack.assert_awaited_once_with(
+        button.DeployStack(stack="s1")
+    )
     coordinator.async_request_refresh.assert_awaited_once()

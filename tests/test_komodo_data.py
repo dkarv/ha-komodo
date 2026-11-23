@@ -113,21 +113,21 @@ def test_stack_on_missing_server_creates_unknown_server():
 
 def test_add_builds_and_sensor():
     from komodo_api.types import BuildState
-    from custom_components.komodo.sensors.build import KomodoBuildStateSensor, create_build_sensors
+    from custom_components.komodo.sensors.build import create_build_sensors
+    from custom_components.komodo.sensors.common import KomodoOptionSensor
 
     data = KomodoData()
     mock_build = MagicMock()
     mock_build.id = "b123"
     mock_build.name = "jarvis-backend"
     mock_build.info.state = BuildState.OK
-    mock_build.info.version = "1.0.0"
+    mock_build.info.version = MagicMock(major=1, minor=0, patch=0)
     mock_build.info.built_hash = "abc12345"
     mock_build.info.latest_hash = "abc12345"
     mock_build.info.repo = "FaserF/Jarvis"
     mock_build.info.branch = "main"
     mock_build.info.repo_link = "https://github.com/FaserF/Jarvis"
-    mock_build.info.last_built_at = "2026-11-04T05:00:00Z"
-    mock_build.info.builder_id = "builder_1"
+    mock_build.info.last_built_at = 1793768400000  # 2026-11-04T05:00:00Z
 
     data.add_builds([mock_build])
     assert "b123" in data.builds
@@ -142,12 +142,38 @@ def test_add_builds_and_sensor():
     sensors = create_build_sensors(coordinator, "entry_1")
     assert len(sensors) == 1
     sensor = sensors[0]
-    assert isinstance(sensor, KomodoBuildStateSensor)
+    assert isinstance(sensor, KomodoOptionSensor)
+    assert sensor._attr_unique_id == "entry_1_b123_build_state"
     assert sensor._attr_entity_registry_enabled_default is False
     assert sensor.native_value == "OK"
     attrs = sensor.extra_state_attributes
     assert attrs["version"] == "1.0.0"
     assert attrs["built_hash"] == "abc12345"
     assert attrs["repo"] == "FaserF/Jarvis"
+    assert attrs["last_built_at"] == "2026-11-04T05:00:00+00:00"
+
+    # Build removed from Komodo: sensor reports UNKNOWN instead of failing.
+    data.builds.clear()
+    assert sensor._extractor(data) == "UNKNOWN"
+    assert sensor.extra_state_attributes is None
 
 
+def test_unversioned_never_built_build():
+    from komodo_api.types import BuildState
+
+    data = KomodoData()
+    mock_build = MagicMock()
+    mock_build.id = "b1"
+    mock_build.name = "x"
+    mock_build.info.state = BuildState.UNKNOWN
+    mock_build.info.version = MagicMock(major=0, minor=0, patch=0)
+    mock_build.info.last_built_at = 0
+    mock_build.info.built_hash = None
+    mock_build.info.repo = ""
+    mock_build.info.branch = ""
+    mock_build.info.repo_link = ""
+    data.add_builds([mock_build])
+    b = data.builds["b1"]
+    assert b.version is None
+    assert b.last_built_at is None
+    assert b.repo is None

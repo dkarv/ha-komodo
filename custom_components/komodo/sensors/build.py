@@ -1,5 +1,3 @@
-from typing import Any
-from homeassistant.helpers.device_registry import DeviceInfo
 from komodo_api.types import BuildState
 
 from ..coordinator import KomodoCoordinator
@@ -8,73 +6,42 @@ from ..utils import create_build_device_info
 from .common import KomodoOptionSensor, KomodoSensor
 
 
-class KomodoBuildStateSensor(KomodoOptionSensor):
-    """Sensor for build pipeline state with CI/CD attributes."""
-
-    def __init__(
-        self,
-        coordinator: KomodoCoordinator,
-        item_id: str,
-        build_id: str,
-        device_info: DeviceInfo,
-    ) -> None:
-        self._build_id = build_id
-        super().__init__(
-            item_id=item_id,
-            coordinator=coordinator,
-            extractor=self._extract_state,
-            key="build_state",
-            device_info=device_info,
-            options=[state.name for state in BuildState],
-            enabled_default=False,
-        )
-
-    def _extract_state(self, data: KomodoData) -> str:
-        build = data.builds.get(self._build_id)
-        if not build or not build.state:
-            return BuildState.UNKNOWN.name
-        if hasattr(build.state, "name"):
-            return build.state.name
-        return str(build.state).upper()
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return git commit, branch, and version attributes."""
-        if not self.coordinator.data or not self.coordinator.data.builds:
-            return {}
-        build = self.coordinator.data.builds.get(self._build_id)
-        if not build:
-            return {}
-        return {
-            "version": build.version,
-            "built_hash": build.built_hash,
-            "latest_hash": build.latest_hash,
-            "repo": build.repo,
-            "branch": build.branch,
-            "repo_link": build.repo_link,
-            "last_built_at": build.last_built_at,
-        }
-
-
 def create_build_sensors(
     coordinator: KomodoCoordinator,
     entry_id: str,
 ) -> list[KomodoSensor]:
-    """Create sensors for each Komodo build pipeline."""
+    """Create sensors for each Komodo build (disabled by default)."""
     sensors: list[KomodoSensor] = []
-    if not coordinator.data or not coordinator.data.builds:
-        return sensors
-
     for build in coordinator.data.builds.values():
-        device_info = create_build_device_info(build, base_url=coordinator.host_url)
-        item_id = f"{entry_id}_build_{build.id}"
+
+        def state(data: KomodoData, bid=build.id) -> str:
+            b = data.builds.get(bid)
+            return b.state.name if b else BuildState.UNKNOWN.name
+
+        def attributes(data: KomodoData, bid=build.id) -> dict | None:
+            b = data.builds.get(bid)
+            if b is None:
+                return None
+            return {
+                "version": b.version,
+                "built_hash": b.built_hash,
+                "latest_hash": b.latest_hash,
+                "repo": b.repo,
+                "branch": b.branch,
+                "repo_link": b.repo_link,
+                "last_built_at": b.last_built_at.isoformat() if b.last_built_at else None,
+            }
 
         sensors.append(
-            KomodoBuildStateSensor(
+            KomodoOptionSensor(
                 coordinator=coordinator,
-                item_id=item_id,
-                build_id=build.id,
-                device_info=device_info,
+                item_id=f"{entry_id}_{build.id}",
+                extractor=state,
+                key="build_state",
+                device_info=create_build_device_info(build, base_url=coordinator.host_url),
+                options=[s.name for s in BuildState],
+                enabled_default=False,
+                attributes_extractor=attributes,
             )
         )
 

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from custom_components.komodo.utils import create_stack_device_info, fix_host, parse_docker_percent, parse_docker_size, split_docker_pair
+from custom_components.komodo.utils import create_build_device_info, create_stack_device_info, fix_host, parse_docker_percent, parse_docker_size, split_docker_pair
 
 @pytest.mark.parametrize("input_host,expected", [
     ("http://192.168.1.1", "http://192.168.1.1"),
@@ -81,3 +81,19 @@ def test_create_stack_device_info_configuration_url():
     # Without base_url
     info_no_url = create_stack_device_info(stack, {"srv1": "dev_srv1"})
     assert info_no_url.get("configuration_url") is None
+
+
+def test_create_build_device_info():
+    build = MagicMock(id="b1", version="1.2.3", built_hash="abcdef1234")
+    build.name = "app"
+    info = create_build_device_info(build, base_url="https://komodo.example.com/")
+    assert info["identifiers"] == {("komodo", "b1")}
+    assert info["name"] == "Build app"
+    assert info["model"] == "Build"
+    assert info["sw_version"] == "1.2.3"
+    assert info["configuration_url"] == "https://komodo.example.com/builds/app"
+
+    build.version = None
+    info = create_build_device_info(build)
+    assert info["sw_version"] == "abcdef12"
+    assert info["configuration_url"] is None

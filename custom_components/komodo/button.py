@@ -1,5 +1,7 @@
+from collections.abc import Awaitable, Callable
+
 from homeassistant.components.button import ButtonEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -13,6 +15,7 @@ from komodo_api.types import (
     RunProcedure,
     DeployStack,
     RunBuild,
+    Update,
 )
 from komodo_api.lib import KomodoClient
 
@@ -86,45 +89,40 @@ class KomodoProcedureButton(ButtonEntity):
         _LOGGER.info("Completed procedure %s", self._procedure.name)
 
 
-class KomodoStackDeployButton(CoordinatorEntity[KomodoCoordinator], ButtonEntity):
-    """Button entity to deploy a stack."""
+class KomodoActionButton(CoordinatorEntity[KomodoCoordinator], ButtonEntity):
+    """Button that runs a Komodo execute action and waits for it to finish."""
 
     def __init__(
         self,
         coordinator: KomodoCoordinator,
         api: KomodoClient,
-        item_id: str,
-        stack_id: str,
-        stack_name: str,
-        device_info,
+        unique_id: str,
+        name: str,
+        device_info: DeviceInfo,
+        icon: str,
+        action: Callable[[KomodoClient], Awaitable[Update]],
+        enabled_default: bool = True,
     ) -> None:
         """Initialize the button entity."""
         super().__init__(coordinator)
         self._api = api
-        self._stack_id = stack_id
-        self._stack_name = stack_name
-
-        self._attr_unique_id = f"{item_id}_deploy_button"
+        self._action = action
+        self._attr_unique_id = unique_id
+        self._attr_name = name
         self._attr_device_info = device_info
-        self._attr_name = f"Deploy {stack_name} stack"
-        self._attr_icon = "mdi:rocket-launch"
+        self._attr_icon = icon
+        self._attr_entity_registry_enabled_default = enabled_default
 
     async def async_press(self) -> None:
-        """Deploy the stack."""
-        _LOGGER.info("Deploying stack %s", self._stack_name)
+        """Run the action, wait for completion and refresh the coordinator."""
+        _LOGGER.info("Starting %s", self._attr_name)
         try:
-            update = await self._api.execute.deployStack(
-                DeployStack(stack=self._stack_id)
-            )
-            update = await wait_for_completion(
-                self._api,
-                update,
-                f"Deploy stack {self._stack_name}",
-            )
-            _LOGGER.info("Completed deployment of stack %s", self._stack_name)
+            update = await self._action(self._api)
+            await wait_for_completion(self._api, update, self._attr_name)
+            _LOGGER.info("Completed %s", self._attr_name)
             await self.coordinator.async_request_refresh()
         except Exception as e:
-            _LOGGER.error("Failed to deploy stack %s: %s", self._stack_name, e)
+            _LOGGER.error("Failed %s: %s", self._attr_name, e)
             raise
 
 
@@ -132,91 +130,42 @@ def create_deploy_buttons_for_stacks(
     coordinator: KomodoCoordinator,
     api: KomodoClient,
     entry_id: str,
-) -> list[KomodoStackDeployButton]:
-    """Create deploy button for each stack."""
-    entities: list[KomodoStackDeployButton] = []
-
-    for stack in coordinator.data.stacks.values():
-        device_info = create_stack_device_info(
-            stack, coordinator.server_device_ids, base_url=coordinator.host_url
-        )
-
-        entity = KomodoStackDeployButton(
+) -> list[KomodoActionButton]:
+    """Create a deploy button for each stack."""
+    return [
+        KomodoActionButton(
             coordinator=coordinator,
             api=api,
-            item_id=f"{entry_id}_{stack.id}",
-            stack_id=stack.id,
-            stack_name=stack.name,
-            device_info=device_info,
+            unique_id=f"{entry_id}_{stack.id}_deploy_button",
+            name=f"Deploy {stack.name} stack",
+            device_info=create_stack_device_info(
+                stack, coordinator.server_device_ids, base_url=coordinator.host_url
+            ),
+            icon="mdi:rocket-launch",
+            action=lambda api, sid=stack.id: api.execute.deployStack(
+                DeployStack(stack=sid)
+            ),
         )
-        entities.append(entity)
-
-    return entities
-
-
-class KomodoBuildRunButton(CoordinatorEntity[KomodoCoordinator], ButtonEntity):
-    """Button entity to trigger a build pipeline."""
-
-    _attr_entity_registry_enabled_default = False
-    _attr_icon = "mdi:hammer-wrench"
-
-    def __init__(
-        self,
-        coordinator: KomodoCoordinator,
-        api: KomodoClient,
-        item_id: str,
-        build_id: str,
-        build_name: str,
-        device_info: DeviceInfo,
-    ) -> None:
-        """Initialize the build button entity."""
-        super().__init__(coordinator)
-        self._api = api
-        self._build_id = build_id
-        self._build_name = build_name
-        self._attr_unique_id = f"{item_id}_run_button"
-        self._attr_device_info = device_info
-        self._attr_name = f"Run {build_name} build"
-
-    async def async_press(self) -> None:
-        """Trigger the build."""
-        _LOGGER.info("Starting build %s", self._build_name)
-        try:
-            update = await self._api.execute.runBuild(
-                RunBuild(build=self._build_id)
-            )
-            update = await wait_for_completion(
-                self._api,
-                update,
-                f"Run build {self._build_name}",
-            )
-            _LOGGER.info("Completed build %s", self._build_name)
-            await self.coordinator.async_request_refresh()
-        except Exception as e:
-            _LOGGER.error("Failed to run build %s: %s", self._build_name, e)
-            raise
+        for stack in coordinator.data.stacks.values()
+    ]
 
 
 def create_build_buttons(
     coordinator: KomodoCoordinator,
     api: KomodoClient,
     entry_id: str,
-) -> list[KomodoBuildRunButton]:
-    """Create run build button for each build pipeline."""
-    entities: list[KomodoBuildRunButton] = []
-    if not coordinator.data or not coordinator.data.builds:
-        return entities
-
-    for build in coordinator.data.builds.values():
-        device_info = create_build_device_info(build, base_url=coordinator.host_url)
-        entity = KomodoBuildRunButton(
+) -> list[KomodoActionButton]:
+    """Create a run button for each build (disabled by default)."""
+    return [
+        KomodoActionButton(
             coordinator=coordinator,
             api=api,
-            item_id=f"{entry_id}_{build.id}",
-            build_id=build.id,
-            build_name=build.name,
-            device_info=device_info,
+            unique_id=f"{entry_id}_{build.id}_run_button",
+            name=f"Run {build.name} build",
+            device_info=create_build_device_info(build, base_url=coordinator.host_url),
+            icon="mdi:hammer-wrench",
+            action=lambda api, bid=build.id: api.execute.runBuild(RunBuild(build=bid)),
+            enabled_default=False,
         )
-        entities.append(entity)
-
-    return entities
+        for build in coordinator.data.builds.values()
+    ]

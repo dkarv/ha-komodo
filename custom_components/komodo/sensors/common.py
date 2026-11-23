@@ -30,14 +30,23 @@ class KomodoEntity(CoordinatorEntity[KomodoCoordinator], Entity):
         extractor,
         key: str,
         device_info: DeviceInfo | None,
+        attributes_extractor=None,
     ) -> None:
         """Initialize the common functionality."""
         super().__init__(coordinator)
         self._extractor = extractor
+        self._attributes_extractor = attributes_extractor
         self._attr_translation_key = key
         self._attr_has_entity_name = True
         self._attr_unique_id = f"{item_id}_{key}"
         self._attr_device_info = device_info
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        """Return extra attributes from the optional attributes extractor."""
+        if self._attributes_extractor is None or self.coordinator.data is None:
+            return None
+        return self._attributes_extractor(self.coordinator.data)
 
 
 class KomodoSensor(KomodoEntity, SensorEntity):
@@ -58,6 +67,7 @@ class KomodoSensor(KomodoEntity, SensorEntity):
         entity_category: EntityCategory | None = None,
         enabled_default: bool = True,
         translation_placeholders: dict[str, str] | None = None,
+        attributes_extractor=None,
     ) -> None:
         """Initialize the sensor with the common coordinator."""
         KomodoEntity.__init__(
@@ -67,6 +77,7 @@ class KomodoSensor(KomodoEntity, SensorEntity):
             extractor=extractor,
             key=key,
             device_info=device_info,
+            attributes_extractor=attributes_extractor,
         )
         self._attr_native_unit_of_measurement = native_unit_of_measurement
         if device_class is not None:
@@ -134,6 +145,7 @@ class KomodoOptionSensor(KomodoSensor):
         device_info: DeviceInfo,
         options: list[str],
         enabled_default: bool = True,
+        attributes_extractor=None,
     ) -> None:
         """Initialize the parent sensor."""
         self._attr_device_class = SensorDeviceClass.ENUM
@@ -145,4 +157,5 @@ class KomodoOptionSensor(KomodoSensor):
             key=key,
             device_info=device_info,
             enabled_default=enabled_default,
+            attributes_extractor=attributes_extractor,
         )

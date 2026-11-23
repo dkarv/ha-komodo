@@ -120,11 +120,11 @@ class KomodoCoordinator(DataUpdateCoordinator[KomodoData]):
             else:
                 data.add_stack_services(responses[3])
 
-            # Builds (CI/CD)
-            if len(responses) > 4 and not isinstance(responses[4], Exception):
+            # Builds
+            if isinstance(responses[4], Exception):
+                _LOGGER.error("Error fetching builds", exc_info=responses[4])
+            else:
                 data.add_builds(responses[4])
-            elif len(responses) > 4 and isinstance(responses[4], Exception):
-                _LOGGER.debug("Error fetching builds: %s", responses[4])
 
         self._compute_update_info(data)
         return data
