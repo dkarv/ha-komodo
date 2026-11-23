@@ -1,0 +1,45 @@
+prune_docker:
+  fields:
+    server:
+      required: true
+      selector:
+        device:
+          multiple: true
+          filter:
+            integration: komodo
+            model: Server
+    prune_type:
+      required: true
+      selector:
+        select:
+          translation_key: prune_type
+          options:
+            - images
+            - containers
+            - volumes
+            - buildx
+            - system
+
+restart_all_containers:
+  fields:
+    server:
+      required: true
+      selector:
+        device:
+          multiple: true
+          filter:
+            integration: komodo
+            model: Server
+
+global_auto_update:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: komodo
+    skip_auto_update:
+      required: false
+      default: false
+      selector:
+        boolean:

@@ -1,4 +1,4 @@
-"""The BWT Perla integration."""
+"""The Komodo integration."""
 
 import logging
 
@@ -8,7 +8,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_registry as er,
+)
+from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     DOMAIN,
@@ -19,9 +24,17 @@ from .const import (
 )
 from .base import KomodoBase
 from .sensors.container import container_sensor_category
+from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.UPDATE, Platform.BUTTON, Platform.SWITCH]
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the Komodo services."""
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -54,6 +67,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             identifiers={(DOMAIN, server.id)},
             name=server.name,
             manufacturer="Komodo",
+            model="Server",
             sw_version=server.periphery_version,
             configuration_url=f"{base_url.rstrip('/')}/servers/{server.name}" if base_url else None,
         ).id
