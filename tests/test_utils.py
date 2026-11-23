@@ -60,3 +60,16 @@ def test_unassigned_stack_device_has_no_parent():
     info = create_stack_device_info(stack, {"": "dev"})
     assert "via_device" not in info
     assert "via_device_id" not in info
+
+
+def test_create_stack_device_info_configuration_url():
+    stack = MagicMock(id="s1", server_id="srv1")
+    stack.name = "jarvis"
+
+    # With base_url
+    info = create_stack_device_info(stack, {"srv1": "dev_srv1"}, base_url="https://komodo.example.com")
+    assert info["configuration_url"] == "https://komodo.example.com/stacks/jarvis"
+
+    # Without base_url
+    info_no_url = create_stack_device_info(stack, {"srv1": "dev_srv1"})
+    assert info_no_url.get("configuration_url") is None
