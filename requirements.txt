@@ -1,4 +1,9 @@
-homeassistant
-mock
-pytest
-pytest-asyncio
+homeassistant==2026.10.4
+mock==5.2.0
+pytest==9.0.3
+pytest-asyncio==1.4.0
+
+# Runtime deps, versions come from custom_components/komodo/manifest.json
+# (installed from there before this file in CI).
+komodo-api
+releaseprobe
