@@ -65,10 +65,18 @@ def test_unassigned_stack_device_has_no_parent():
 def test_create_stack_device_info_configuration_url():
     stack = MagicMock(id="s1", server_id="srv1")
     stack.name = "jarvis"
+    stack.deployed_hash = "641203c12345678"
+    stack.branch = "main"
 
-    # With base_url
+    # With base_url and deployed_hash
     info = create_stack_device_info(stack, {"srv1": "dev_srv1"}, base_url="https://komodo.example.com")
     assert info["configuration_url"] == "https://komodo.example.com/stacks/jarvis"
+    assert info["sw_version"] == "641203c1"
+
+    # Without deployed_hash, falls back to branch
+    stack.deployed_hash = None
+    info_branch = create_stack_device_info(stack, {"srv1": "dev_srv1"})
+    assert info_branch["sw_version"] == "main"
 
     # Without base_url
     info_no_url = create_stack_device_info(stack, {"srv1": "dev_srv1"})
