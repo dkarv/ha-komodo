@@ -177,3 +177,59 @@ def test_unversioned_never_built_build():
     assert b.version is None
     assert b.last_built_at is None
     assert b.repo is None
+
+
+def test_add_procedures_and_actions():
+    from komodo_api.types import ActionState, ProcedureState
+    from custom_components.komodo.sensors.automation import create_automation_sensors
+
+    data = KomodoData()
+    mock_proc = MagicMock()
+    mock_proc.id = "p1"
+    mock_proc.name = "backup-db"
+    mock_proc.info.state = ProcedureState.OK
+    mock_proc.info.last_run_at = 1793768400000  # 2026-11-04T05:00:00Z
+    mock_proc.info.next_scheduled_run = 1793854800000  # 2026-11-05T05:00:00Z
+    mock_proc.info.schedule_error = None
+    mock_proc.info.stages = 3
+
+    mock_act = MagicMock()
+    mock_act.id = "a1"
+    mock_act.name = "prune-cache"
+    mock_act.info.state = ActionState.FAILED
+    mock_act.info.last_run_at = None
+    mock_act.info.next_scheduled_run = None
+    mock_act.info.schedule_error = "bad cron"
+
+    data.add_procedures([mock_proc])
+    data.add_actions([mock_act])
+    assert data.procedures["p1"].stages == 3
+    assert data.actions["a1"].name == "prune-cache"
+
+    coordinator = MagicMock()
+    coordinator.data = data
+    coordinator.host_url = "https://komodo.example.com"
+    proc_sensor, act_sensor = create_automation_sensors(coordinator, "entry_1")
+
+    assert proc_sensor._attr_unique_id == "entry_1_p1_procedure_state"
+    assert proc_sensor._attr_entity_registry_enabled_default is False
+    assert proc_sensor.native_value == "OK"
+    assert proc_sensor.extra_state_attributes == {
+        "last_run_at": "2026-11-04T05:00:00+00:00",
+        "next_scheduled_run": "2026-11-05T05:00:00+00:00",
+        "schedule_error": None,
+        "stages": 3,
+    }
+
+    assert act_sensor._attr_unique_id == "entry_1_a1_action_state"
+    assert act_sensor.native_value == "FAILED"
+    assert act_sensor.extra_state_attributes == {
+        "last_run_at": None,
+        "next_scheduled_run": None,
+        "schedule_error": "bad cron",
+    }
+
+    # Procedure removed from Komodo: sensor reports UNKNOWN instead of failing.
+    data.procedures.clear()
+    assert proc_sensor._extractor(data) == "UNKNOWN"
+    assert proc_sensor.extra_state_attributes is None

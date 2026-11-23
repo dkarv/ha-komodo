@@ -10,42 +10,6 @@ def mock_komodo_api():
     api.execute.runProcedure = AsyncMock()
     return api
 
-@pytest.fixture
-def mock_procedure():
-    class Procedure:
-        id = "test_id"
-        name = "Test Procedure"
-    return Procedure()
-
-def test_button_entity_creation(mock_komodo_api, mock_procedure):
-    entity = button.KomodoProcedureButton(mock_komodo_api, "entry_id", mock_procedure)
-    assert entity.entity_id == "button.komodo_button_test_id"
-    assert entity._attr_unique_id == "entry_id_button_test_id"
-    assert entity._attr_name == "Procedure Test Procedure"
-
-def test_async_press_calls_runProcedure(monkeypatch, mock_komodo_api, mock_procedure):
-    entity = button.KomodoProcedureButton(mock_komodo_api, "entry_id", mock_procedure)
-    mock_update = MagicMock()
-    mock_komodo_api.execute.runProcedure.return_value = mock_update
-
-    # Patch wait_for_completion
-    called = {}
-    async def fake_wait_for_completion(api, update, name):
-        called['api'] = api
-        called['update'] = update
-        called['name'] = name
-        return "done"
-    monkeypatch.setattr(button, "wait_for_completion", fake_wait_for_completion)
-
-    asyncio.run(entity.async_press())
-    mock_komodo_api.execute.runProcedure.assert_awaited_once_with(
-        button.RunProcedure(procedure=mock_procedure.id)
-    )
-    assert called['api'] == mock_komodo_api
-    assert called['update'] == mock_update
-    assert called['name'] == "Procedure Test Procedure"
-
-
 def _coordinator(**data):
     coordinator = MagicMock()
     coordinator.data = MagicMock(**data)
@@ -109,5 +73,46 @@ def test_stack_deploy_button(monkeypatch, mock_komodo_api):
     asyncio.run(btn.async_press())
     mock_komodo_api.execute.deployStack.assert_awaited_once_with(
         button.DeployStack(stack="s1")
+    )
+    coordinator.async_request_refresh.assert_awaited_once()
+
+
+def test_procedure_run_button(monkeypatch, mock_komodo_api):
+    procedure = _resource("p1", "backup")
+    coordinator = _coordinator(procedures={"p1": procedure})
+
+    [btn] = button.create_procedure_buttons(coordinator, mock_komodo_api, "entry")
+    # Unique id from before procedures moved to the coordinator must not change.
+    assert btn._attr_unique_id == "entry_button_p1"
+    assert btn._attr_entity_registry_enabled_default is True
+    assert btn._attr_name == "Run backup procedure"
+
+    mock_update = MagicMock()
+    mock_komodo_api.execute.runProcedure = AsyncMock(return_value=mock_update)
+    called = _fake_wait(monkeypatch)
+
+    asyncio.run(btn.async_press())
+    mock_komodo_api.execute.runProcedure.assert_awaited_once_with(
+        button.RunProcedure(procedure="p1")
+    )
+    assert called["update"] == mock_update
+    coordinator.async_request_refresh.assert_awaited_once()
+
+
+def test_action_run_button(monkeypatch, mock_komodo_api):
+    action = _resource("a1", "daily_backup")
+    coordinator = _coordinator(actions={"a1": action})
+
+    [btn] = button.create_action_buttons(coordinator, mock_komodo_api, "entry")
+    assert btn._attr_unique_id == "entry_a1_run_button"
+    assert btn._attr_entity_registry_enabled_default is False
+    assert btn._attr_name == "Run daily_backup action"
+
+    mock_komodo_api.execute.runAction = AsyncMock()
+    _fake_wait(monkeypatch)
+
+    asyncio.run(btn.async_press())
+    mock_komodo_api.execute.runAction.assert_awaited_once_with(
+        button.RunAction(action="a1")
     )
     coordinator.async_request_refresh.assert_awaited_once()
