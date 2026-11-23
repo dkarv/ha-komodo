@@ -13,11 +13,11 @@ from custom_components.komodo.data.server import KomodoServer
 from custom_components.komodo.data.service import KomodoUpdateInfo
 
 
-def _stack_item(stack_id, services):
+def _stack_item(stack_id, services, server_id="server_id"):
     item = MagicMock()
     item.id = stack_id
     item.name = stack_id
-    item.info.server_id = "server_id"
+    item.info.server_id = server_id
     item.info.services = [
         StackServiceWithUpdate(service=name, image=f"{name}:1", update_available=update)
         for name, update in services
@@ -94,3 +94,18 @@ def test_server_without_stats():
     server = KomodoServer(item)
     assert server.cpu_percent is None
     assert server.disk_percent is None
+
+
+def test_unassigned_stack_creates_no_unknown_server():
+    data = KomodoData()
+    data.add_stacks([_stack_item("s1", [("web", False)], server_id="")])
+    assert data.servers == {}
+    assert data.stacks["s1"].server_id is None
+
+
+def test_stack_on_missing_server_creates_unknown_server():
+    data = KomodoData()
+    data.add_stacks([_stack_item("s1", [("web", False)], server_id="gone")])
+    server = data.servers["gone"]
+    assert server.name == "Unknown Server gone"
+    assert server.stack_count == 1

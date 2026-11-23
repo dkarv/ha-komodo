@@ -43,7 +43,7 @@ class KomodoServiceSwitch(CoordinatorEntity[KomodoCoordinator], SwitchEntity):
         stack_id: str,
         stack_name: str,
         service_name: str,
-        server_id: str,
+        server_id: str | None,
         device_info,
     ) -> None:
         """Initialize the switch entity."""
