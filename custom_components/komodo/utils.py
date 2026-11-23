@@ -10,6 +10,7 @@ from .const import DOMAIN
 
 if TYPE_CHECKING:
     from .data.stack import KomodoStack
+    from .data.build import KomodoBuild
 
 import logging
 
@@ -19,24 +20,39 @@ _LOGGER = logging.getLogger(__name__)
 _SUPPORTS_VIA_DEVICE_ID = (MAJOR_VERSION, MINOR_VERSION) >= (2026, 8)
 
 
+def _resource_device_info(
+    resource_id: str,
+    name: str,
+    path: str,
+    base_url: str | None,
+    sw_version: str | None,
+    model: str | None = None,
+) -> DeviceInfo:
+    """Create device info for a Komodo resource, linking to its page in the UI."""
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, resource_id)},
+        name=name,
+        manufacturer="Komodo",
+        sw_version=sw_version,
+        configuration_url=f"{base_url.rstrip('/')}/{path}" if base_url else None,
+    )
+    if model is not None:
+        device_info["model"] = model
+    return device_info
+
+
 def create_stack_device_info(
     stack: "KomodoStack",
     server_device_ids: dict[str, str],
     base_url: str | None = None,
 ) -> DeviceInfo:
     """Create device info for a stack, linked to the device of its server."""
-    config_url = f"{base_url.rstrip('/')}/stacks/{stack.name}" if base_url else None
-    sw_ver = None
-    if stack.deployed_hash:
-        sw_ver = stack.deployed_hash[:8]
-    elif stack.branch:
-        sw_ver = stack.branch
-    device_info = DeviceInfo(
-        identifiers={(DOMAIN, stack.id)},
-        name=stack.name,
-        manufacturer="Komodo",
-        sw_version=sw_ver,
-        configuration_url=config_url,
+    device_info = _resource_device_info(
+        stack.id,
+        stack.name,
+        f"stacks/{stack.name}",
+        base_url,
+        sw_version=stack.deployed_hash[:8] if stack.deployed_hash else (stack.branch or None),
     )
     if not stack.server_id:
         # Unassigned stack: there is no server device to link to.
@@ -46,6 +62,21 @@ def create_stack_device_info(
     elif (server_device_id := server_device_ids.get(stack.server_id)) is not None:
         device_info["via_device_id"] = server_device_id
     return device_info
+
+
+def create_build_device_info(
+    build: "KomodoBuild",
+    base_url: str | None = None,
+) -> DeviceInfo:
+    """Create device info for a build."""
+    return _resource_device_info(
+        build.id,
+        f"Build {build.name}",
+        f"builds/{build.name}",
+        base_url,
+        sw_version=build.version or (build.built_hash[:8] if build.built_hash else None),
+        model="Build",
+    )
 
 
 def fix_host(host: str) -> str:
