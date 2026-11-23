@@ -9,9 +9,9 @@ updates:
         patterns:
           - "*"
 
-  # Covers requirements.txt. The komodo-api and releaseprobe versions pinned in
-  # custom_components/komodo/manifest.json are NOT covered by Dependabot
-  # and have to be bumped by hand.
+  # Covers requirements.txt and requirements_test.txt. Runtime deps live in
+  # manifest.json, which Dependabot can't read; they're left unversioned in
+  # requirements.txt and must be bumped in manifest.json by hand.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
