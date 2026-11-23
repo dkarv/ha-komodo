@@ -17,32 +17,9 @@ This gives you full visibility and basic control over your Komodo-managed infras
 
 ## Installation
 
-### 1. Installation via HACS My Home Assistant (Recommended)
+The easiest way to install the Komodo integration is via the **Home Assistant Marketplace** (Home Assistant 2026.11 or newer).
 
-The easiest way to install the Komodo integration is via HACS.
-
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dkarv&repository=ha-komodo&category=integration)
-
-### 2. Installation via HACS Manually
-
-HACS (Home Assistant Community Store) makes installation and updates simple. Since this is a custom component, you must first add the repository to HACS.
-
-1. In Home Assistant, go to **HACS**.
-2. Go to the **Integrations** tab.
-3. Click the three dots **(⋮)** in the top right corner and select **Custom repositories**.
-4. Enter the URL: `https://github.com/dkarv/ha-komodo`
-5. Select **Integration** as the Category.
-6. Click **ADD**.
-7. After the repository is added, search for **"Komodo"** in the HACS Integrations section and click **Download**.
-8. **Restart Home Assistant** to load the new integration.
-
-### 3. Manual Installation
-
-1. Download the latest release zip file from the [GitHub releases page](https://github.com/dkarv/ha-komodo/releases).
-2. Extract the contents. You should find a folder named `ha-komodo`.
-3. Copy the entire `ha-komodo` folder into your Home Assistant configuration directory under `custom_components/`.
-   - **Resulting Path:** `config/custom_components/komodo/`
-4. **Restart Home Assistant** to load the new integration.
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=dkarv&repository=ha-komodo&category=integration)
 
 ***
 
