@@ -25,6 +25,7 @@ from .const import (
 from .base import KomodoBase
 from .sensors.container import container_sensor_category
 from .services import async_setup_services
+from .utils import resource_url
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.UPDATE, Platform.BUTTON, Platform.SWITCH]
@@ -69,7 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             manufacturer="Komodo",
             model="Server",
             sw_version=server.periphery_version,
-            configuration_url=f"{base_url.rstrip('/')}/servers/{server.name}" if base_url else None,
+            configuration_url=resource_url(base_url, "servers", server.id),
         ).id
         for server in komodo.coordinator.data.servers.values()
     }

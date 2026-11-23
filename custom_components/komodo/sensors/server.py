@@ -4,6 +4,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from komodo_api.types import ServerState
 
 from ..const import DOMAIN
+from ..utils import resource_url
 from ..coordinator import KomodoCoordinator
 from .common import KomodoOptionSensor, KomodoSensor
 
@@ -16,7 +17,7 @@ def create_server_sensors(
     sensors: list[KomodoSensor] = []
     base_url = coordinator.host_url
     for server in coordinator.data.servers.values():
-        config_url = f"{base_url.rstrip('/')}/servers/{server.name}" if base_url else None
+        config_url = resource_url(base_url, "servers", server.id)
         device_info = DeviceInfo(
             identifiers={(DOMAIN, server.id)},
             name=server.name,

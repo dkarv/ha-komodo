@@ -70,7 +70,7 @@ def test_create_stack_device_info_configuration_url():
 
     # With base_url and deployed_hash
     info = create_stack_device_info(stack, {"srv1": "dev_srv1"}, base_url="https://komodo.example.com")
-    assert info["configuration_url"] == "https://komodo.example.com/stacks/jarvis"
+    assert info["configuration_url"] == "https://komodo.example.com/stacks/s1"
     assert info["sw_version"] == "641203c1"
 
     # Without deployed_hash, falls back to branch
@@ -91,7 +91,7 @@ def test_create_build_device_info():
     assert info["name"] == "Build app"
     assert info["model"] == "Build"
     assert info["sw_version"] == "1.2.3"
-    assert info["configuration_url"] == "https://komodo.example.com/builds/app"
+    assert info["configuration_url"] == "https://komodo.example.com/builds/b1"
 
     build.version = None
     info = create_build_device_info(build)

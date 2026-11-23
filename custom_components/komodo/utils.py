@@ -21,10 +21,15 @@ _LOGGER = logging.getLogger(__name__)
 _SUPPORTS_VIA_DEVICE_ID = (MAJOR_VERSION, MINOR_VERSION) >= (2026, 8)
 
 
+def resource_url(base_url: str | None, kind: str, resource_id: str) -> str | None:
+    """Link to a resource's page in the Komodo UI, by id so it survives renames."""
+    return f"{base_url.rstrip('/')}/{kind}/{resource_id}" if base_url else None
+
+
 def _resource_device_info(
     resource_id: str,
     name: str,
-    path: str,
+    kind: str,
     base_url: str | None,
     sw_version: str | None,
     model: str | None = None,
@@ -35,7 +40,7 @@ def _resource_device_info(
         name=name,
         manufacturer="Komodo",
         sw_version=sw_version,
-        configuration_url=f"{base_url.rstrip('/')}/{path}" if base_url else None,
+        configuration_url=resource_url(base_url, kind, resource_id),
     )
     if model is not None:
         device_info["model"] = model
@@ -51,7 +56,7 @@ def create_stack_device_info(
     device_info = _resource_device_info(
         stack.id,
         stack.name,
-        f"stacks/{stack.name}",
+        "stacks",
         base_url,
         sw_version=stack.deployed_hash[:8] if stack.deployed_hash else (stack.branch or None),
     )
@@ -73,7 +78,7 @@ def create_build_device_info(
     return _resource_device_info(
         build.id,
         f"Build {build.name}",
-        f"builds/{build.name}",
+        "builds",
         base_url,
         sw_version=build.version or (build.built_hash[:8] if build.built_hash else None),
         model="Build",
@@ -88,7 +93,7 @@ def create_procedure_device_info(
     return _resource_device_info(
         procedure.id,
         f"Procedure {procedure.name}",
-        f"procedures/{procedure.name}",
+        "procedures",
         base_url,
         sw_version=None,
         model="Procedure",
@@ -103,7 +108,7 @@ def create_action_device_info(
     return _resource_device_info(
         action.id,
         f"Action {action.name}",
-        f"actions/{action.name}",
+        "actions",
         base_url,
         sw_version=None,
         model="Action",
